@@ -2,20 +2,22 @@
 //
 //   +------------------------------------+----------+
 //   | AGENTS  counts                     | button 1 |
-//   |  up to 4 sessions (tap = open)     +----------+
+//   |  up to 4 sessions                  +----------+
 //   +------------+------------+----------+ button 2 |
 //   | CPU        | MEMORY     | NETWORK  +----------+
 //   |            |            |          | button 3 |
 //   +------------+------------+----------+----------+
 //
 // Buttons are the host's "home" pins (else the first three). Disk stays on the Stats page.
+// The agents panel is a single tap target that opens the Agents page, where each session
+// has its own card.
 #include <stdio.h>
 
 #include "deck.h"
 
 #define COL_W 236          // right column: same width as the shortcut buttons elsewhere
 #define ROWS 4             // agent sessions listed in the summary panel
-enum { CTRL_ROW = HOME_BUTTONS, CTRL_PANEL = HOME_BUTTONS + ROWS };  // control indices
+enum { CTRL_PANEL = HOME_BUTTONS };  // control index of the agents panel (after the buttons)
 static const int home_tiles[] = {0, 1, 3};  // TILE slots: CPU, memory, network
 
 static Rect left(void) { Rect a = content_area(); return (Rect){a.x, a.y, a.w - COL_W - 16, a.h}; }
@@ -46,7 +48,6 @@ static void draw_summary(int ox) {
     for (; n < ROWS && agent_slot(n) >= 0; n++) {
         const Agent *a = &agents[agent_slot(n)];
         Rect r = shift(row(n), ox);
-        if (button_state(CTRL_ROW + n, 1) == BTN_PRESSED) fill_r(r, mix(C_PANEL, C_TEXT, 18));
         fill(r.x, r.y + 4, 4, r.h - 8, a->state == AGENT_IDLE ? C_MUTED : agent_state_color(a->state));
         char meta[48];
         snprintf(meta, sizeof meta, "%s  %s", a->agent, a->since);
@@ -73,15 +74,12 @@ static void render(int ox) {
 static int hit(int x, int y) {
     for (int i = 0; i < HOME_BUTTONS; i++)
         if (home_button(i) >= 0 && in_rect(grid_cell(right(), 1, HOME_BUTTONS, 16, i), x, y)) return i;
-    for (int i = 0; i < ROWS && agent_slot(i) >= 0; i++)
-        if (in_rect(row(i), x, y)) return CTRL_ROW + i;
     return in_rect(summary(), x, y) ? CTRL_PANEL : -1;
 }
 
 static void press(int i) {
     if (i < HOME_BUTTONS) mac_button_press(home_button(i));
-    else if (i < CTRL_PANEL) agent_focus(agent_slot(i - CTRL_ROW));
-    else page_show(&page_agents);  // the rest of the panel opens the Agents page
+    else page_show(&page_agents);
 }
 
 const Page page_home = {"Home", render, hit, press};
