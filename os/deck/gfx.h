@@ -53,6 +53,8 @@ uint32_t level_color(int level, int invert);
 void ui_tile(Rect r, const char *label, const char *value, const char *detail, int level, int flags);
 enum { BTN_NORMAL, BTN_PRESSED, BTN_DISABLED };
 void ui_button(Rect r, const char *label, uint32_t color, int state);
+// A button with an icon (16x16 bits, or NULL) above its label; the icon uses the label's ink.
+void ui_button_icon(Rect r, const char *label, const uint16_t *icon, uint32_t color, int state);
 void ui_panel(Rect r, const char *label, const char *value, uint32_t value_color);
 void ui_meter(Rect r, int level, uint32_t color);
 // On/off switch: a track with a square knob; `busy` fades it while a change is in flight.
@@ -61,6 +63,7 @@ void ui_switch(Rect r, int on, int busy);
 typedef struct { int w, h; const char *rows[16]; } Icon;
 extern const Icon icon_off, icon_person, icon_people;
 void icon(const Icon *ic, int x, int y, int scale, uint32_t hex);
+void icon_bits(const uint16_t rows[16], int x, int y, int scale, uint32_t hex);  // 16x16, MSB = left
 // Segmented control: n choices shown as icons (2x) with `sel` filled; `pressed` (or -1) is highlighted.
 void ui_segments(Rect r, const Icon *const *icons, int n, int sel, int pressed, int busy);
 // Area/line chart of up to 4 series (n samples each, oldest first) on a 0..max scale.

@@ -128,6 +128,12 @@ void icon(const Icon *ic, int x, int y, int scale, uint32_t hex) {
             if (ic->rows[r][c] == '#') fill(x + c * scale, y + r * scale, scale, scale, hex);
 }
 
+void icon_bits(const uint16_t rows[16], int x, int y, int scale, uint32_t hex) {
+    for (int r = 0; r < 16; r++)
+        for (int c = 0; c < 16; c++)
+            if (rows[r] & (0x8000 >> c)) fill(x + c * scale, y + r * scale, scale, scale, hex);
+}
+
 void ui_segments(Rect r, const Icon *const *icons, int n, int sel, int pressed, int busy) {
     fill_r(r, C_BAR);
     for (int i = 0; i < n; i++) {
@@ -152,12 +158,18 @@ void ui_tile(Rect r, const char *label, const char *value, const char *detail, i
     if (detail) text(&font_s, r.x + 16, r.y + r.h - 60, detail, C_DIM, right);
 }
 
-void ui_button(Rect r, const char *label, uint32_t color, int state) {
+void ui_button(Rect r, const char *label, uint32_t color, int state) { ui_button_icon(r, label, NULL, color, state); }
+
+void ui_button_icon(Rect r, const char *label, const uint16_t *ic, uint32_t color, int state) {
     if (!label) { fill_r(r, C_PANEL); return; }
     uint32_t bg = state == BTN_PRESSED ? 0xffffff : state == BTN_DISABLED ? C_MUTED : color;
     uint32_t ink = state == BTN_PRESSED ? C_INK : state == BTN_DISABLED ? C_DIM : color == C_LOCAL ? C_TEXT : C_INK;
     fill_r(r, bg);
-    text_center(&font_m, inset(r, 8), label, ink);
+    if (!ic) { text_center(&font_m, inset(r, 8), label, ink); return; }
+    int scale = r.h >= 120 ? 3 : 2, gap = 10;            // 48 px icons on the big buttons, 32 px on small
+    int top = r.y + (r.h - (16 * scale + gap + font_m.h)) / 2;
+    icon_bits(ic, r.x + (r.w - 16 * scale) / 2, top, scale, ink);
+    text_center(&font_m, (Rect){r.x + 8, top + 16 * scale + gap, r.w - 16, font_m.h}, label, ink);
 }
 
 // Panel with a small label on the left and a medium value on the right of its header.
