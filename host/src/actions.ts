@@ -3,6 +3,7 @@
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { promisify } from "node:util";
+import { iconHex } from "./icons.ts";
 
 const run = promisify(execFile);
 
@@ -13,7 +14,8 @@ export type Action =
 // Up to 12 buttons: all appear on the Shortcuts page; those with `home: true` (or, if none
 // are flagged, the first four) are also pinned to the Home page.
 export const MAX_BUTTONS = 12;
-export interface ButtonDef { id: string; label: string; color: string; home?: boolean; action: Action }
+// `icon` names a 16x16 pixel-art file in host/icons/ (shown above the label on the deck).
+export interface ButtonDef { id: string; label: string; color: string; home?: boolean; icon?: string; action: Action }
 
 export function loadButtons(dir: string): ButtonDef[] {
   const local = new URL("../config.json", dir), example = new URL("../config.example.json", dir);
@@ -23,6 +25,9 @@ export function loadButtons(dir: string): ButtonDef[] {
   for (const b of cfg.buttons) {
     if (!/^[a-z0-9_-]{1,31}$/.test(b.id)) throw new Error(`bad button id: ${JSON.stringify(b.id)}`);
     if (!/^[0-9a-f]{6}$/i.test(b.color)) throw new Error(`bad color for ${b.id}`);
+    if (b.icon) {
+      try { iconHex(b.icon); } catch (e) { console.warn(`${b.id}: ${(e as Error).message}; shown without an icon`); delete b.icon; }
+    }
   }
   console.log(`buttons from ${file.pathname.split("/").slice(-2).join("/")}: ${cfg.buttons.map((b) => b.id).join(", ")}`);
   if (cfg.buttons.length > MAX_BUTTONS) console.warn(`only the first ${MAX_BUTTONS} buttons are used`);

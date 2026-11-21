@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 import { loadButtons, MAX_BUTTONS, runAction, type ButtonDef } from "./actions.ts";
 import { AgentWatcher, ago, ascii, listAgents, type Agent } from "./agents.ts";
 import { focusAgent } from "./focus.ts";
+import { iconHex } from "./icons.ts";
 import { readMac, setMac } from "./mac.ts";
 import { collect } from "./metrics.ts";
 
@@ -123,6 +124,7 @@ function session(sock: net.Socket): Promise<void> {
           for (let s = 0; s < MAX_BUTTONS; s++) {
             const b = buttons[s];
             send("BUTTON", s, b?.id ?? "", b?.label ?? "", b?.color ?? "000000", b?.home ? "home" : "");
+            if (b?.icon) send("ICON", "button", s, iconHex(b.icon));
           }
           for (const [k, v] of Object.entries(settings)) send("SETTING", k, v);
           send("STATUS", `Connected to ${os.hostname().replace(/\.local$/, "")}`);
