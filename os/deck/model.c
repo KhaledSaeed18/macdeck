@@ -7,6 +7,7 @@
 
 Tile tiles[MAX_TILES];
 Button buttons[MAX_BUTTONS];
+Agent agents[MAX_AGENTS];
 char clock_time[16] = "--:--", clock_date[32] = "";
 int connected = 0, dirty = 1;
 
@@ -93,6 +94,18 @@ static int handle_button(char **f, int n) {
     return 1;
 }
 
+static int handle_agent(char **f, int n) {  // AGENT|slot|agent|state|title|where|since[|detail]
+    int s = atoi(f[1]);
+    if (s < 0 || s >= MAX_AGENTS) return 0;
+    Agent *a = &agents[s];
+    if (n < 7 || !f[2][0]) { int was = a->set; *a = (Agent){0}; return was; }
+    int st = !strcmp(f[3], "working") ? AGENT_WORKING : !strcmp(f[3], "waiting") ? AGENT_WAITING : AGENT_IDLE;
+    int changed = SET(a->agent, f[2]) | SET(a->title, f[4]) | SET(a->where, f[5]) | SET(a->since, f[6]) |
+                  SET(a->detail, n >= 8 ? f[7] : "") | (st != a->state) | !a->set;
+    a->state = st; a->set = 1;
+    return changed;
+}
+
 void model_handle(char *line) {
     char *f[8];
     int n = split(line, f, 8), changed = 0;
@@ -101,6 +114,7 @@ void model_handle(char *line) {
     else if (!strcmp(type, "CLOCK") && n >= 3) changed = SET(clock_time, f[1]) | SET(clock_date, f[2]);
     else if (!strcmp(type, "TILE") && n >= 6) changed = handle_tile(f);
     else if (!strcmp(type, "BUTTON") && n >= 5) changed = handle_button(f, n);
+    else if (!strcmp(type, "AGENT") && n >= 3) changed = handle_agent(f, n);
     else if (!strcmp(type, "SAMPLE") && n >= 3) {
         Series *s = series_get(f[1], 1);
         if (s) { series_push(s, (float)atof(f[2])); changed = 1; }

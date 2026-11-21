@@ -20,6 +20,7 @@
 #define MAX_TILES 4
 #define MAX_BUTTONS 12
 #define HOME_BUTTONS 4
+#define MAX_AGENTS 6    // agent session cards (Agents page)
 #define HISTORY 120     // samples kept per series (~2 min at 1/s)
 
 struct pollfd;
@@ -34,9 +35,12 @@ void copy(char *dst, size_t cap, const char *src);
 typedef struct { char label[32], value[24], detail[40]; int level, set; } Tile;
 typedef struct { char id[32], label[32]; unsigned color; int home; } Button;
 typedef struct { char key[16]; float v[HISTORY]; int n, head; } Series;
+enum { AGENT_IDLE, AGENT_WORKING, AGENT_WAITING };
+typedef struct { char agent[16], title[48], where[40], since[12], detail[48]; int state, set; } Agent;
 
 extern Tile tiles[MAX_TILES];
 extern Button buttons[MAX_BUTTONS];
+extern Agent agents[MAX_AGENTS];
 extern char clock_time[16], clock_date[32];
 extern int connected, dirty;
 
