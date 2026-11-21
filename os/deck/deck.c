@@ -266,6 +266,13 @@ int main(int argc, char **argv) {
     logmsg("%s starting, pid %d uid %d", BUILD, getpid(), getuid());
     write_file("/sys/class/backlight/panel/brightness", "160");
 
+    {   // record how we were booted (normal vs charger/LPM) for diagnostics
+        char cmd[2048] = ""; FILE *c = fopen("/proc/cmdline", "r");
+        if (c) { size_t n = fread(cmd, 1, sizeof cmd - 1, c); cmd[n] = 0; fclose(c); }
+        const char *m = strstr(cmd, "androidboot.mode="), *l = strstr(cmd, "lpm_boot=");
+        logmsg("boot: %.40s %.12s recovery=%d", m ? m : "androidboot.mode=(none)", l ? l : "", strstr(cmd, "recovery_mode=1") != NULL);
+    }
+
     fbfd = open_retry("/dev/graphics/fb0", O_RDWR);
     if (fbfd < 0 || ioctl(fbfd, FBIOGET_VSCREENINFO, &vi) || ioctl(fbfd, FBIOGET_FSCREENINFO, &fi) || vi.bits_per_pixel != 32) {
         logmsg("fb0 unusable"); return 1;
