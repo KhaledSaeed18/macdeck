@@ -59,8 +59,16 @@ void page_show(const Page *p) {
 // ---------------------------------------------------------------- page picker
 // The squares' touch zone is much larger than the squares, and reaches a little above the bar.
 static Rect squares_zone(void) { return (Rect){W / 2 - 110, H - BOTTOM - 12, 220, BOTTOM + 12}; }
-static Rect sheet(void) { return (Rect){16, H - BOTTOM - 16 - 232, W - 32, 232}; }
-static Rect pick_tile(int i) { Rect s = sheet(); return grid_cell((Rect){s.x + 16, s.y + 48, s.w - 32, s.h - 64}, NPAGES, 1, 16, i); }
+// Up to five pages sit in one row of tall tiles (number above title); more wrap into rows of
+// shorter tiles with the number beside the title.
+#define PICK_COLS (NPAGES <= 5 ? NPAGES : (NPAGES + 1) / 2)
+#define PICK_ROWS ((NPAGES + PICK_COLS - 1) / PICK_COLS)
+#define PICK_TILE_H (PICK_ROWS == 1 ? 168 : 96)
+static Rect sheet(void) {
+    int h = 48 + PICK_ROWS * PICK_TILE_H + (PICK_ROWS - 1) * 16 + 16;
+    return (Rect){16, H - BOTTOM - 16 - h, W - 32, h};
+}
+static Rect pick_tile(int i) { Rect s = sheet(); return grid_cell((Rect){s.x + 16, s.y + 48, s.w - 32, s.h - 64}, PICK_COLS, PICK_ROWS, 16, i); }
 
 int chrome_hit(int x, int y) {
     if (in_rect(squares_zone(), x, y)) return CTRL_SQUARES;
@@ -93,8 +101,13 @@ static void draw_picker(void) {
         if (cur) frame_r(t, 3, C_ACCENT);
         char num[8];
         snprintf(num, sizeof num, "%d", i + 1);
-        text(&font_l, t.x + 16, t.y + 12, num, ink, 0);
-        text(&font_m, t.x + 16, t.y + t.h - 48, registry[i]->title, ink, t.x + t.w - 8);
+        if (PICK_ROWS == 1) {
+            text(&font_l, t.x + 16, t.y + 12, num, ink, 0);
+            text(&font_m, t.x + 16, t.y + t.h - 48, registry[i]->title, ink, t.x + t.w - 8);
+        } else {
+            text(&font_l, t.x + 20, t.y + (t.h - 64) / 2, num, ink, 0);
+            text(&font_m, t.x + 80, t.y + (t.h - 32) / 2, registry[i]->title, ink, t.x + t.w - 8);
+        }
         if (registry[i] == &page_agents && connected && agent_counts.waiting > 0) {  // same amber as the badge
             snprintf(num, sizeof num, "%d", agent_counts.waiting);
             int w = text_w(&font_s, num) + 16;
