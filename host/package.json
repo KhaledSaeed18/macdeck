@@ -5,9 +5,12 @@
   "license": "MIT",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.18" },
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "start": "node src/main.ts",
-    "check": "node --check src/main.ts"
+    "check": "node --check src/main.ts",
+    "test": "node --test test/*.test.ts"
   }
 }
