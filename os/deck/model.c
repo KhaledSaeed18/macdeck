@@ -9,6 +9,7 @@ Tile tiles[MAX_TILES];
 Button buttons[MAX_BUTTONS];
 Agent agents[MAX_AGENTS];
 AgentCounts agent_counts;
+MacState mac;
 char clock_time[16] = "--:--", clock_date[32] = "";
 int connected = 0, dirty = 1;
 
@@ -114,6 +115,31 @@ static int handle_agent(char **f, int n) {  // AGENT|slot|agent|state|title|wher
     return changed;
 }
 
+// ---------------------------------------------------------------- Mac page state
+static int mac_value(int k, int v) {  // while the user's change is in flight, only its confirmation counts
+    if (mac.pending[k] && now() < mac.pending[k] && v != mac.val[k]) return 0;
+    int changed = v != mac.val[k] || mac.pending[k];  // also redraw when a pending change is confirmed
+    mac.pending[k] = 0; mac.val[k] = v;
+    return changed;
+}
+
+static int handle_mac(char **f, int n) {  // MAC|battery|pct|charging|source|line|detail, MAC|sound|vol|muted, ...
+    const char *k = f[1];
+    int on = n >= 3 && !strcmp(f[2], "on"), changed = !mac.have;
+    mac.have = 1;
+    if (!strcmp(k, "battery") && n >= 7) {
+        changed |= mac.batt_pct != atoi(f[2]) || mac.batt_charging != atoi(f[3]);
+        mac.batt_pct = atoi(f[2]); mac.batt_charging = atoi(f[3]);
+        changed |= SET(mac.batt_source, f[4]) | SET(mac.batt_line, f[5]) | SET(mac.batt_detail, f[6]);
+    } else if (!strcmp(k, "sound") && n >= 4) changed |= mac_value(MAC_VOLUME, atoi(f[2])) | mac_value(MAC_MUTE, atoi(f[3]));
+    else if (!strcmp(k, "wifi") && n >= 4) changed |= mac_value(MAC_WIFI, on) | SET(mac.wifi_detail, f[3]);
+    else if (!strcmp(k, "airdrop") && n >= 3)
+        changed |= mac_value(MAC_AIRDROP, !strcmp(f[2], "everyone") ? AIRDROP_EVERYONE : !strcmp(f[2], "off") ? AIRDROP_OFF : AIRDROP_CONTACTS);
+    else if (!strcmp(k, "awake") && n >= 4) changed |= mac_value(MAC_AWAKE, on) | SET(mac.awake_detail, f[3]);
+    else if (!strcmp(k, "dark") && n >= 3) changed |= mac_value(MAC_DARK, on);
+    return changed;
+}
+
 void model_handle(char *line) {
     char *f[10];
     int n = split(line, f, 10), changed = 0;
@@ -123,6 +149,7 @@ void model_handle(char *line) {
     else if (!strcmp(type, "TILE") && n >= 6) changed = handle_tile(f);
     else if (!strcmp(type, "BUTTON") && n >= 5) changed = handle_button(f, n);
     else if (!strcmp(type, "AGENT") && n >= 3) changed = handle_agent(f, n);
+    else if (!strcmp(type, "MAC") && n >= 3) changed = handle_mac(f, n);
     else if (!strcmp(type, "AGENTS") && n >= 5) {
         AgentCounts c = {atoi(f[1]), atoi(f[2]), atoi(f[3]), atoi(f[4])};
         changed = memcmp(&c, &agent_counts, sizeof c) != 0;

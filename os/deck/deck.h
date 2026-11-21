@@ -42,6 +42,20 @@ typedef struct { int total, waiting, working, idle; } AgentCounts;  // all sessi
 extern Tile tiles[MAX_TILES];
 extern Button buttons[MAX_BUTTONS];
 extern Agent agents[MAX_AGENTS];
+
+// The Mac page's state (MAC messages). Switches and choices show the user's change at once
+// ("optimistic") and keep it until the Mac reports the same value or the change times out.
+enum { MAC_WIFI, MAC_AIRDROP, MAC_AWAKE, MAC_DARK, MAC_VOLUME, MAC_MUTE, MAC_NKEYS };
+enum { AIRDROP_OFF, AIRDROP_CONTACTS, AIRDROP_EVERYONE };
+typedef struct {
+    int have;                                   // a MAC message has arrived since connecting
+    int batt_pct, batt_charging;
+    char batt_source[24], batt_line[48], batt_detail[64], wifi_detail[48], awake_detail[32];
+    int val[MAC_NKEYS];                         // 0/1 switches, AIRDROP_*, volume 0..100
+    double pending[MAC_NKEYS];                  // time until which val[k] is the user's change
+} MacState;
+extern MacState mac;
+void mac_set(int key, int value);              // change a Mac control (optimistic + MACSET)
 extern AgentCounts agent_counts;
 extern char clock_time[16], clock_date[32];
 extern int connected, dirty;
@@ -93,7 +107,7 @@ typedef struct {
     void (*press)(int i);          // activate control i
 } Page;
 
-extern const Page page_home, page_agents, page_stats, page_shortcuts, page_tablet;
+extern const Page page_home, page_agents, page_stats, page_shortcuts, page_mac, page_tablet;
 extern int page, pressed;          // current page; pressed control on it (-1 = none)
 extern float drag;                 // horizontal offset while swiping / settling
 int  page_count(void);
