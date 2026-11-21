@@ -37,7 +37,7 @@
 
 #include "font_spleen.h"
 
-#define BUILD "deck-2.1"
+#define BUILD "deck-2.2"
 #define PORT 8765
 #define MAX_LINE 512
 #define LINK_TIMEOUT 5.0
@@ -150,9 +150,9 @@ typedef struct { char label[32], value[24], detail[40]; int level, set; } Tile;
 typedef struct { char id[32], label[32]; uint32_t color; } Button;
 static Tile tiles[4];
 static Button buttons[6];
-static char clock_time[16] = "--:--", clock_date[32] = "", status[128] = "Waiting for the Mac...";
+static char clock_time[16] = "--:--", clock_date[32] = "", status[128] = "";
 static int connected = 0, dirty = 1, page = 0, pressed = -1;  // pressed = button slot on current page
-static double last_rx = 0, status_at = 0, disconnected_at = 0;
+static double last_rx = 0, status_until = 0, disconnected_at = 0;
 static float drag = 0;  // horizontal page offset in pixels while swiping / animating
 
 // Tablet info (sampled from sysfs)
@@ -174,7 +174,12 @@ enum { SCREEN_ON, SCREEN_DIM, SCREEN_OFF };
 static int screen = SCREEN_ON;
 static double last_activity = 0;
 
-static void set_status(const char *s) { copy(status, sizeof status, s); status_at = now(); dirty = 1; }
+// Bottom-left status line. Events ("Opened Calculator", "Brightness 60") are toasts that
+// clear after a few seconds; the only persistent text is a state that is still true
+// ("Waiting for the Mac..." while disconnected), so whatever is shown is always current.
+#define TOAST_SECS 4
+static void toast(const char *s, double secs) { copy(status, sizeof status, s); status_until = now() + secs; dirty = 1; }
+static void set_status(const char *s) { toast(s, TOAST_SECS); }
 
 // ---------------------------------------------------------------- layout
 static void tile_rect(int i, int *x, int *y, int *w, int *h) { *x = 16 + (i % 2) * 254; *y = TOP + 16 + (i / 2) * 246; *w = 238; *h = 230; }
@@ -401,7 +406,8 @@ static void render(void) {
     }
     // bottom bar: status, page dots, battery
     fill(0, H - BOTTOM, W, BOTTOM, rgb(C_BAR));
-    text(&font_s, 20, H - BOTTOM + 8, status, rgb(now() - status_at < 4 ? C_TEXT : C_DIM), W / 2 - 60);
+    if (now() < status_until) text(&font_s, 20, H - BOTTOM + 8, status, rgb(C_TEXT), W / 2 - 60);
+    else if (!connected) text(&font_s, 20, H - BOTTOM + 8, "Waiting for the Mac...", rgb(C_DIM), W / 2 - 60);
     for (int p = 0; p < PAGES; p++) {
         int cx = W / 2 - (PAGES - 1) * 12 + p * 24;
         fill(cx - 5, H - BOTTOM / 2 - 5, 10, 10, rgb(p == page ? C_ACCENT : 0x3a4650));
@@ -453,8 +459,11 @@ static void handle(char *line) {
         copy(buttons[s].id, sizeof buttons[s].id, f[2]); copy(buttons[s].label, sizeof buttons[s].label, f[3]);
         buttons[s].color = (uint32_t)strtoul(f[4], NULL, 16);
         changed = 1;
-    } else if (!strcmp(f[0], "STATUS") && n >= 2) { set_status(f[1]); return; }
-    else if (!strcmp(f[0], "SETTING") && n >= 3) { apply_setting(f[1], f[2], 0); return; }
+    } else if (!strcmp(f[0], "STATUS") && n >= 2) {  // optional 3rd field: seconds to show
+        double secs = n >= 3 ? atof(f[2]) : TOAST_SECS;
+        toast(f[1], secs > 0 && secs <= 60 ? secs : TOAST_SECS);
+        return;
+    } else if (!strcmp(f[0], "SETTING") && n >= 3) { apply_setting(f[1], f[2], 0); return; }
     else if (!strcmp(f[0], "WAKE")) { activity(); set_screen(SCREEN_ON, "mac"); return; }
     if (changed && screen != SCREEN_OFF) dirty = 1;
 }
@@ -463,7 +472,7 @@ static void drop_client(const char *why) {
     if (client < 0) return;
     logmsg("client dropped: %s", why);
     close(client); client = -1; rxlen = 0;
-    connected = 0; disconnected_at = now(); set_status("Mac disconnected - waiting...");
+    connected = 0; disconnected_at = now(); set_status("Mac disconnected");
 }
 
 static void read_client(void) {
@@ -535,7 +544,7 @@ static void press(int i) {
     if (page == 1) { tablet_button(i); return; }
     logmsg("press %s", buttons[i].id);
     if (connected) { send_line("PRESS|%s", buttons[i].id); set_status("Sent to Mac..."); }
-    else set_status("Mac not connected");
+    else toast("Mac not connected", 8);
 }
 
 static void touch_frame(const char *mode, int xmax, int ymax) {
@@ -665,7 +674,7 @@ int main(int argc, char **argv) {
         if (screen == SCREEN_ON && dim_after && idle > dim_after) set_screen(SCREEN_DIM, "idle");
         if (screen != SCREEN_OFF && off_after && idle > off_after) set_screen(SCREEN_OFF, "idle");
         if (screen != SCREEN_OFF && !connected && t - disconnected_at > 120 && idle > 120) set_screen(SCREEN_OFF, "mac gone");
-        if (status_at && t - status_at > 4) { dirty = 1; status_at = 0; }  // fade the status line
+        if (status_until && t >= status_until) { status_until = 0; status[0] = 0; dirty = 1; }  // toast expired
         if (anim_start) {  // settle the page slide
             double k = (t - anim_start) / 0.18;
             if (k >= 1) { drag = 0; anim_start = 0; }
