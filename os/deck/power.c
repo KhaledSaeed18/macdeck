@@ -105,6 +105,7 @@ void set_screen(int s, const char *why) {
         if (screen == SCREEN_OFF) { dirty = 1; drag = 0; pressed = -1; }
         set_backlight(s == SCREEN_DIM && brightness > DIM_LEVEL ? DIM_LEVEL : brightness);
     }
+    if (s != SCREEN_ON) picker_open = 0;
     if (s != SCREEN_ON && page != 0) { page = 0; drag = 0; pressed = -1; dirty = 1; }  // idle: back to Home
     screen = s;
     link_send("SCREEN|%s", screen_name(s));

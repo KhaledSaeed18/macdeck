@@ -8,7 +8,7 @@
 static const Page *const registry[] = {&page_home, &page_agents, &page_stats, &page_shortcuts, &page_tablet};
 #define NPAGES (int)(sizeof registry / sizeof registry[0])
 
-int page = 0, pressed = -1;
+int page = 0, pressed = -1, picker_open = 0;
 float drag = 0;
 static int drawing;  // index of the page currently being drawn
 
@@ -53,8 +53,57 @@ void agent_focus(int slot) {
 
 void page_show(const Page *p) {
     for (int i = 0; i < NPAGES; i++)
-        if (registry[i] == p) { page = i; drag = 0; pressed = -1; dirty = 1; }
+        if (registry[i] == p) { page = i; drag = 0; pressed = -1; picker_open = 0; dirty = 1; logmsg("page %d (%s)", i, p->title); }
 }
+
+// ---------------------------------------------------------------- page picker
+// The squares' touch zone is much larger than the squares, and reaches a little above the bar.
+static Rect squares_zone(void) { return (Rect){W / 2 - 110, H - BOTTOM - 12, 220, BOTTOM + 12}; }
+static Rect sheet(void) { return (Rect){16, H - BOTTOM - 16 - 232, W - 32, 232}; }
+static Rect pick_tile(int i) { Rect s = sheet(); return grid_cell((Rect){s.x + 16, s.y + 48, s.w - 32, s.h - 64}, NPAGES, 1, 16, i); }
+
+int chrome_hit(int x, int y) {
+    if (in_rect(squares_zone(), x, y)) return CTRL_SQUARES;
+    if (!picker_open) return -1;
+    for (int i = 0; i < NPAGES; i++)
+        if (in_rect(pick_tile(i), x, y)) return CTRL_PICK + i;
+    return CTRL_PICK_CLOSE;  // anywhere else while the picker is open closes it
+}
+
+void chrome_press(int c) {
+    if (c == CTRL_SQUARES) picker_open = !picker_open;
+    else if (c == CTRL_PICK_CLOSE) picker_open = 0;
+    else if (c >= CTRL_PICK && c < CTRL_PICK + NPAGES) page_show(registry[c - CTRL_PICK]);
+    if (c < CTRL_PICK) logmsg("picker %s", picker_open ? "open" : "closed");  // page jumps log in page_show
+    dirty = 1;
+}
+
+static void draw_picker(void) {
+    shade_r((Rect){0, TOP, W, H - TOP - BOTTOM}, 35);  // the page stays visible, dimmed
+    Rect s = sheet();
+    fill_r(s, C_BAR);
+    frame_r(s, 2, C_MUTED);
+    text(&font_s, s.x + 16, s.y + 14, "GO TO PAGE", C_DIM, 0);
+    text_right(&font_s, s.x + s.w - 16, s.y + 14, "tap outside to close", C_DIM);
+    for (int i = 0; i < NPAGES; i++) {
+        Rect t = pick_tile(i);
+        int cur = i == page;
+        uint32_t ink = cur ? C_ACCENT : C_TEXT;
+        fill_r(t, pressed == CTRL_PICK + i ? mix(C_PANEL, C_TEXT, 18) : C_PANEL);
+        if (cur) frame_r(t, 3, C_ACCENT);
+        char num[8];
+        snprintf(num, sizeof num, "%d", i + 1);
+        text(&font_l, t.x + 16, t.y + 12, num, ink, 0);
+        text(&font_m, t.x + 16, t.y + t.h - 48, registry[i]->title, ink, t.x + t.w - 8);
+        if (registry[i] == &page_agents && connected && agent_counts.waiting > 0) {  // same amber as the badge
+            snprintf(num, sizeof num, "%d", agent_counts.waiting);
+            int w = text_w(&font_s, num) + 16;
+            fill(t.x + t.w - 12 - w, t.y + 12, w, 28, C_WARN);
+            text(&font_s, t.x + t.w - 12 - w + 8, t.y + 14, num, C_INK, 0);
+        }
+    }
+}
+
 
 // ---------------------------------------------------------------- chrome
 static void needs_you_badge(int right) {  // amber pill while any agent session waits for the user
@@ -98,8 +147,11 @@ static void bottom_bar(void) {
     const char *t = toast_text();
     if (t) text(&font_s, 20, H - BOTTOM + 8, t, C_TEXT, W / 2 - 80);
     else if (!connected) text(&font_s, 20, H - BOTTOM + 8, "Waiting for the Mac...", C_DIM, W / 2 - 80);
-    for (int p = 0; p < NPAGES; p++)
-        fill(W / 2 - (NPAGES - 1) * 12 + p * 24 - 5, H - BOTTOM / 2 - 5, 10, 10, p == page ? C_ACCENT : C_MUTED);
+    // page squares: a faint pill behind them marks them as a control (brighter while pressed or open)
+    uint32_t pill = mix(C_BAR, C_TEXT, pressed == CTRL_SQUARES ? 22 : picker_open ? 14 : 5);
+    fill(W / 2 - (NPAGES - 1) * 12 - 18, H - BOTTOM + 6, (NPAGES - 1) * 24 + 36, BOTTOM - 12, pill);
+    for (int p = 0; p < NPAGES; p++)  // other squares stay a step brighter than the pill behind them
+        fill(W / 2 - (NPAGES - 1) * 12 + p * 24 - 5, H - BOTTOM / 2 - 5, 10, 10, p == page ? C_ACCENT : mix(pill, C_TEXT, 20));
     battery_badge();
 }
 
@@ -114,6 +166,7 @@ void pages_render(void) {
         registry[drawing]->render(ox);
     }
     gfx_noclip();
+    if (picker_open) draw_picker();
     bottom_bar();
     present();
     dirty = 0;

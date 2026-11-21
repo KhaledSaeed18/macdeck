@@ -116,3 +116,11 @@ const char *agent_state_name(int state);   // "NEEDS YOU", "WORKING", "IDLE"
 uint32_t agent_state_color(int state);     // dimmed while the Mac is not connected
 void agent_focus(int slot);                // ask the Mac to bring that session's app to the front
 void page_show(const Page *p);             // switch to a page (e.g. Home -> Agents)
+
+// Chrome controls, outside any page: the page squares in the bottom bar open the page picker,
+// a sheet with one tile per page. Their indices start at CHROME_CTRL so they never collide
+// with a page's own control indices.
+enum { CHROME_CTRL = 1000, CTRL_SQUARES = CHROME_CTRL, CTRL_PICK_CLOSE, CTRL_PICK /* + page index */ };
+extern int picker_open;
+int  chrome_hit(int x, int y);             // chrome control under the point, or -1
+void chrome_press(int c);
