@@ -1,7 +1,7 @@
 # MacDeck build. Requires the Android NDK (any recent version; r28 used) and Python 3.
 #   make            build build/deck (tablet) and build/deck-preview (Mac)
-#   make image      build build/macdeck-os-v1.img (needs MACDECK_STOCK_BOOT, see README)
-#   make preview    render the deck UI with sample data to build/preview.png
+#   make image      build build/macdeck-os-v$MACDECK_VERSION.img (needs MACDECK_STOCK_BOOT, see README)
+#   make preview    render every deck page with sample data to build/preview-<page>.png
 #   make clean
 NDK ?= $(firstword $(ANDROID_NDK_HOME) $(wildcard $(HOME)/Library/Android/sdk/ndk/*))
 HOST_TAG ?= $(shell uname -s | tr A-Z a-z)-x86_64
@@ -10,21 +10,28 @@ CC := $(TOOLCHAIN)/armv7a-linux-androideabi21-clang
 STRIP := $(TOOLCHAIN)/llvm-strip
 CFLAGS := -static -O2 -Wall -Wextra
 
+DECK_SRC := $(addprefix os/deck/,util.c gfx.c model.c link.c power.c pages.c \
+             page_home.c page_stats.c page_shortcuts.c page_tablet.c)
+DECK_HDR := $(wildcard os/deck/*.h)
+
 all: build/deck build/deck-preview
 
-build/deck: os/deck/deck.c os/deck/font_spleen.h
+build/deck: $(DECK_SRC) os/deck/input.c os/deck/main.c $(DECK_HDR)
 	@mkdir -p build
-	$(CC) $(CFLAGS) -Ios/deck -o build/deck.debug $<
+	$(CC) $(CFLAGS) -Ios/deck -o build/deck.debug $(DECK_SRC) os/deck/input.c os/deck/main.c
 	$(STRIP) -o $@ build/deck.debug
 
-# Host-side UI preview (Mac cc, renders to an image instead of the framebuffer)
-build/deck-preview: os/deck/preview.c os/deck/deck.c os/deck/font_spleen.h
+# Host-side UI preview (Mac cc): the same modules minus input/main, rendering to an image
+build/deck-preview: $(DECK_SRC) os/deck/preview.c $(DECK_HDR)
 	@mkdir -p build
-	cc -O2 -Wall -Wno-unused-function -Ios/deck -o $@ os/deck/preview.c
+	cc -O2 -Wall -Wextra -Ios/deck -o $@ $(DECK_SRC) os/deck/preview.c
 
+PAGES := home stats shortcuts tablet
 preview: build/deck-preview
-	build/deck-preview build/preview.ppm 0 && sips -s format png build/preview.ppm --out build/preview.png >/dev/null
-	build/deck-preview build/preview-tablet.ppm 1 && sips -s format png build/preview-tablet.ppm --out build/preview-tablet.png >/dev/null
+	@i=0; for p in $(PAGES); do \
+	  build/deck-preview build/preview-$$p.ppm $$i >/dev/null && \
+	  sips -s format png build/preview-$$p.ppm --out build/preview-$$p.png >/dev/null && echo build/preview-$$p.png; \
+	  i=$$((i+1)); done
 
 # Regenerate the font header from the Spleen BDF sources (third_party/spleen)
 font:
