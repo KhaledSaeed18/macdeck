@@ -9,6 +9,8 @@
 //                is working until its newest session_message row is an "idle" one
 //   Copilot CLI  ~/.copilot/session-state/<id>/events.jsonl: a turn runs from user.message /
 //                assistant.turn_start until assistant.turn_end (or session.shutdown)
+//   Qwen Code    ~/.qwen/projects/<dir>/chats/<id>.jsonl: the model's turn continues while its
+//                last message calls a tool; a final text-only reply ends it
 //
 // One rule for every agent: a session is listed while it is working or waiting for the user,
 // and for IDLE_SHOWN_MS after it went idle; then it is removed (listAgents).
@@ -33,6 +35,7 @@ const CLAUDE_SESSIONS = path.join(HOME, ".claude", "sessions");
 const CODEX_HOME = path.join(HOME, ".codex");
 const OPENCODE_DB = path.join(HOME, ".local", "share", "opencode", "opencode.db");
 const COPILOT_SESSIONS = path.join(HOME, ".copilot", "session-state");
+const QWEN_PROJECTS = path.join(HOME, ".qwen", "projects");
 const IDLE_SHOWN_MS = 30 * 60_000;  // keep an idle session on the deck this long, then drop it
 const STALE_MS = 15 * 60_000;    // a "working" session with no activity this long is assumed dead
 
@@ -173,7 +176,7 @@ function opencodeSessions(): Agent[] {
   return out;
 }
 
-// ---- JSONL session logs (Copilot): recent files, newest records first
+// ---- JSONL session logs (Copilot, Qwen): recent files, newest records first
 function recentLogs(files: string[]): { file: string; mtime: number }[] {
   const now = Date.now(), out: { file: string; mtime: number }[] = [];
   for (const file of files) {
@@ -224,6 +227,24 @@ function copilotSessions(): Agent[] {
   return out;
 }
 
+function qwenSessions(): Agent[] {
+  const files = listDir(QWEN_PROJECTS).flatMap((p) =>
+    listDir(path.join(QWEN_PROJECTS, p, "chats")).filter((f) => f.endsWith(".jsonl")).map((f) => path.join(QWEN_PROJECTS, p, "chats", f)));
+  const out: Agent[] = [], now = Date.now();
+  for (const { file, mtime } of recentLogs(files)) {
+    let last: Record<string, any> | undefined;
+    for (const r of newestRecords(file)) if (r.type !== "system") { last = r; break; }  // skip telemetry
+    if (!last) continue;
+    const callsTool = (last.message?.parts ?? []).some((p: Record<string, unknown>) => p.functionCall);
+    const working = (last.type !== "assistant" || callsTool) && now - mtime < STALE_MS;
+    const where = folder(last.cwd);
+    out.push({ key: `qwen:${last.sessionId ?? file}`, agent: "Qwen", state: working ? "working" : "idle",
+      title: firstPrompt(file, (r) => r.type === "user" && r.message?.parts?.find((p: { text?: string }) => p.text)?.text) || where || "Qwen",
+      where, since: Date.parse(last.timestamp) || mtime });
+  }
+  return out;
+}
+
 const RANK: Record<AgentState, number> = { waiting: 0, working: 1, idle: 2 };
 
 // One unreadable source (a format change after an agent update) must not hide the others.
@@ -233,7 +254,7 @@ function safe(name: string, read: () => Agent[]): Agent[] {
 
 export function listAgents(): Agent[] {
   const now = Date.now(), all = [...safe("claude", claudeSessions), ...safe("codex", codexSessions), ...safe("opencode", opencodeSessions),
-    ...safe("copilot", copilotSessions)];
+    ...safe("copilot", copilotSessions), ...safe("qwen", qwenSessions)];
   return all.filter((a) => a.state !== "idle" || now - a.since <= IDLE_SHOWN_MS).sort((a, b) => RANK[a.state] - RANK[b.state] || b.since - a.since);
 }
 
