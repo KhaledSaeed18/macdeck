@@ -12,8 +12,8 @@ Swipe left/right; the dots in the bottom bar show the position. The deck returns
 
 | Page | What it shows |
 |---|---|
-| **Home** | four headline Mac metrics and four pinned shortcuts |
-| **Agents** | up to six coding-agent sessions (Claude Code, Codex, opencode, Copilot CLI, Qwen Code): needs you, working or idle, and for how long |
+| **Home** | a summary: agent sessions (counts and the top four; tap one to open it), CPU, memory and network, and three pinned shortcuts |
+| **Agents** | up to six coding-agent sessions (Claude Code, Codex, opencode, Copilot CLI, Qwen Code): needs you, working or idle, and for how long; tap a card to open that session on the Mac |
 | **Stats** | live charts (about 2 minutes) of CPU, memory and network down/up, plus a disk meter |
 | **Shortcuts** | up to 12 buttons that run allowlisted actions on the Mac |
 | **Tablet** | battery, power draw, brightness and system readings; brightness, dim/off timeouts, CPU mode, screen off |
@@ -100,7 +100,7 @@ sequenceDiagram
     D->>H: SCREEN|on
     H->>D: BUTTON x12 · SETTING (saved brightness, timeouts, CPU mode)
     loop every second
-        H->>D: CLOCK · TILE x4 · SAMPLE (cpu, mem, net_down, net_up) · AGENT x6 · PING
+        H->>D: CLOCK · TILE x4 · SAMPLE (cpu, mem, net_down, net_up) · AGENTS · AGENT x6 · PING
         D->>H: PONG
     end
     U->>D: tap "Ghostty"
@@ -109,6 +109,9 @@ sequenceDiagram
     H->>D: STATUS|Opened Ghostty (toast for 4 s)
     Note over H: a Claude Code session starts waiting for permission
     H->>D: WAKE · STATUS|Claude needs you: ... (toast for 15 s)
+    U->>D: tap that session's card
+    D->>H: FOCUS|<id>
+    H->>H: open -a Claude (the app owning the session's process)
     U->>D: Tablet page: "Brighter"
     D->>H: SETTING|brightness|120
     H->>H: save to state.json
@@ -161,6 +164,8 @@ The host reads what the agents already write to disk. Nothing is installed into 
 - Up to six cards, sorted: needs you, then working, then idle; within each, the most recent first. Anything beyond six is not shown.
 - One rule for every agent: a session is shown while it is working or needs you, and for 30 minutes after it goes idle; then it is removed. A session that claims to be working but has been silent for 15 minutes is treated as idle (a crashed or killed run).
 - Sessions without a name are titled by their first prompt, else the project folder.
+- **Tap a session** (on Home or Agents) and the Mac brings its app to the front. The host walks up from the session's process to the outermost app in `/Applications`: the terminal it runs in (Ghostty, Terminal, ...) or its desktop app (Claude, ChatGPT for Codex Desktop, OpenCode). Sessions without a recorded process are matched by a running agent process with the same working folder. Only the app is activated, not a specific tab, and tmux or ssh sessions can't be traced.
+- An amber **N NEEDS YOU** badge in the top bar shows on every page while any session waits for you. With more than six sessions, the last card becomes **+N more**.
 - Only Claude Code reports "needs you". The others don't write permission waits to disk.
 - **Other agents need their own reader.** Each tool stores its state differently, so an agent that isn't in this table won't appear. A reader is a function in `host/src/agents.ts` that returns the tool's sessions. Gemini CLI isn't supported yet: on the development Mac it never completed a turn, so there was no real log to build a reader from.
 - When a session starts waiting for you, or finishes a turn, the host wakes the screen and shows a toast for 15 s (even if the screen was off). A new state has to hold for two polls in a row, to ignore flicker.
