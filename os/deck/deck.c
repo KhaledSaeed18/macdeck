@@ -29,7 +29,7 @@
 
 #include "font_spleen.h"
 
-#define BUILD "deck-1.2"
+#define BUILD "deck-1.4"
 #define PORT 8765
 #define MAX_LINE 512
 #define LINK_TIMEOUT 5.0
@@ -250,6 +250,25 @@ static void loopback_up(void) {
     if (s >= 0) close(s);
 }
 
+// Find the touchscreen by name instead of assuming event0: in Samsung's low-power
+// charging mode the touch driver is not registered and event0 is the power key.
+static int open_touch(void) {
+    for (int attempt = 0; attempt < 50; attempt++) {
+        for (int i = 0; i < 16; i++) {
+            char path[32], name[64] = "";
+            snprintf(path, sizeof path, "/dev/input/event%d", i);
+            int fd = open(path, O_RDONLY | O_NONBLOCK);
+            if (fd < 0) continue;
+            ioctl(fd, EVIOCGNAME(sizeof name), name);
+            if (strstr(name, "touch")) { logmsg("touchscreen: %s (%s)", path, name); return fd; }
+            close(fd);
+        }
+        usleep(100000);  // ueventd may still be creating /dev nodes
+    }
+    logmsg("no touchscreen found");
+    return -1;
+}
+
 static int open_retry(const char *path, int flags) {
     for (int i = 0; i < 50; i++) {  // ueventd may still be creating /dev nodes
         int fd = open(path, flags);
@@ -265,7 +284,6 @@ int main(int argc, char **argv) {
     logf = fopen(argc > 1 ? argv[1] : "/tmp/deck.log", "a");
     logmsg("%s starting, pid %d uid %d", BUILD, getpid(), getuid());
     write_file("/sys/class/backlight/panel/brightness", "160");
-
     {   // record how we were booted (normal vs charger/LPM) for diagnostics
         char cmd[2048] = ""; FILE *c = fopen("/proc/cmdline", "r");
         if (c) { size_t n = fread(cmd, 1, sizeof cmd - 1, c); cmd[n] = 0; fclose(c); }
@@ -287,7 +305,7 @@ int main(int argc, char **argv) {
     logmsg("fb0 %dx%d line=%u", W, H, fi.line_length);
     layout();
 
-    int in = open_retry("/dev/input/event0", O_RDONLY | O_NONBLOCK);
+    int in = open_touch();
     // Touch coordinate mapping. Samsung's stock kernel reports the panel's native portrait
     // axes (x 0..598, y 0..1022) while fb0 is landscape 1024x600; TWRP's kernel reports
     // landscape. Detect from the axis ranges; MACDECK_TOUCH=none|rot|rotinv overrides.
