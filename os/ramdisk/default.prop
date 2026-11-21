@@ -1,0 +1,9 @@
+#
+# MacDeck OS v0 — development build properties
+# ro.secure=0 + ro.debuggable=1 keep adbd running as root; ro.adb.secure=0 skips RSA key auth.
+#
+ro.secure=0
+ro.adb.secure=0
+ro.debuggable=1
+ro.macdeck.version=0
+persist.sys.usb.config=adb

@@ -1,0 +1,52 @@
+# MacDeck OS v0 — minimal init.rc for Samsung's stock Android 4.4 init (SM-T210).
+# No Android framework: only ueventd (device nodes), adbd (dev access) and our deck0.
+# Notes:
+#  - Stock init REBOOTS INTO RECOVERY if /sepolicy fails to load, so the stock policy files
+#    are kept in the ramdisk and the kernel cmdline sets androidboot.selinux=permissive.
+#  - Stock init also reboots into recovery if a "critical" service crashes repeatedly,
+#    so nothing here is marked critical.
+#  - /system is mounted read-only only so adbd's shell (/system/bin/sh) and toolbox work
+#    during development. Nothing from /system is started.
+
+on early-init
+    write /proc/1/oom_adj -16
+    setcon u:r:init:s0
+    start ueventd
+
+on init
+    export PATH /sbin:/system/bin:/system/xbin
+    export LD_LIBRARY_PATH /system/lib
+    export ANDROID_ROOT /system
+    mkdir /tmp 0775 root root
+    mount tmpfs tmpfs /tmp mode=0775
+    mkdir /data 0771 root root
+    mount tmpfs tmpfs /data mode=0771
+    mkdir /data/local 0771 root root
+    mkdir /data/local/tmp 0771 root root
+
+on fs
+    mount ext4 /dev/block/platform/sdhci-pxav3.2/by-name/SYSTEM /system ro wait
+
+on boot
+    write /sys/class/android_usb/android0/enable 0
+    write /sys/class/android_usb/android0/idVendor 04e8
+    write /sys/class/android_usb/android0/idProduct 6860
+    write /sys/class/android_usb/android0/iManufacturer MacDeck
+    write /sys/class/android_usb/android0/iProduct MacDeckOS-v0
+    write /sys/class/android_usb/android0/iSerial $ro.serialno
+    write /sys/class/android_usb/android0/functions adb
+    write /sys/class/android_usb/android0/enable 1
+    start adbd
+    start deck0
+
+service ueventd /sbin/ueventd
+    seclabel u:r:ueventd:s0
+
+service adbd /sbin/adbd
+    socket adbd stream 660 system system
+    disabled
+    seclabel u:r:adbd:s0
+
+service deck0 /sbin/deck0
+    disabled
+    seclabel u:r:init_shell:s0

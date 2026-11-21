@@ -1,0 +1,23 @@
+# ---- Local-only material (never published) ----
+# Project notes, journal, evidence photos/logs, copied reference reports
+docs/
+# Raw partition dumps from the tablet (contain device-unique data such as EFS)
+backups/
+# Third-party downloads and builds (Heimdall source/build, TWRP image + keyring)
+tools/
+# Scratch / anything personal
+local/
+
+# ---- Build outputs ----
+build/
+*.img
+*.img.sha256
+*.debug
+*.stripped
+
+# ---- Editor / OS noise ----
+.DS_Store
+.cache/
+.vscode/
+.idea/
+__pycache__/
