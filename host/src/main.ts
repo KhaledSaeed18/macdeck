@@ -3,18 +3,21 @@
 // each PRESS.
 // Protocol: ../../protocol/PROTOCOL.md.   Run: node src/main.ts
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import { promisify } from "node:util";
 import { loadButtons, MAX_BUTTONS, runAction, type ButtonDef } from "./actions.ts";
-import { AgentWatcher, ago, ascii, listAgents } from "./agents.ts";
+import { AgentWatcher, ago, ascii, listAgents, type Agent } from "./agents.ts";
+import { focusAgent } from "./focus.ts";
 import { collect } from "./metrics.ts";
 
 const run = promisify(execFile);
 const LOCAL_PORT = Number(process.env.MACDECK_PORT ?? 18765);
 const DECK_PORT = 8765;
 const MAX_AGENTS = 6;   // agent cards on the deck's Agents page
+const agentId = (key: string) => createHash("sha1").update(key).digest("hex").slice(0, 8);
 const SERIAL = process.env.MACDECK_SERIAL ?? "";
 const ADB = process.env.ADB ?? [
   `${process.env.ANDROID_HOME ?? `${os.homedir()}/Library/Android/sdk`}/platform-tools/adb`,
@@ -40,6 +43,7 @@ function session(sock: net.Socket): Promise<void> {
     let buf = "", lastRx = Date.now(), seq = 0, greeted = false, screenOn = true;
     const send = (...fields: (string | number)[]) => sock.write(fields.map((f) => clean(String(f))).join("|") + "\n");
     const watcher = new AgentWatcher();
+    let shownAgents = new Map<string, Agent>();  // id -> session, for FOCUS taps
 
     // Agent sessions: notices (and a screen wake) even while the screen is off; the cards
     // themselves only while it is on.
@@ -53,10 +57,17 @@ function session(sock: net.Socket): Promise<void> {
         send("STATUS", ascii(`${a.agent} ${what}: ${a.title}`, 60), 15);
       }
       if (!screenOn) return;
+      const count = (st: string) => agents.filter((a) => a.state === st).length;
+      send("AGENTS", agents.length, count("waiting"), count("working"), count("idle"));
+      // With more sessions than cards, the last card becomes "+N more" on the deck.
+      const cards = agents.length > MAX_AGENTS ? MAX_AGENTS - 1 : MAX_AGENTS;
+      shownAgents = new Map();
       for (let s = 0; s < MAX_AGENTS; s++) {
-        const a = agents[s];
+        const a = s < cards ? agents[s] : undefined;
         if (!a) { send("AGENT", s, ""); continue; }
-        send("AGENT", s, a.agent, a.state, ascii(a.title, 28), ascii(a.where, 28), ago(a.since), ascii(a.detail ?? "", 28));
+        const id = agentId(a.key);
+        shownAgents.set(id, a);
+        send("AGENT", s, a.agent, a.state, ascii(a.title, 28), ascii(a.where, 28), ago(a.since), ascii(a.detail ?? "", 28), id);
       }
     };
 
@@ -103,6 +114,13 @@ function session(sock: net.Socket): Promise<void> {
           if (on !== screenOn) log(`tablet screen ${f[0]}`);
           screenOn = on;
           if (on) void tick();
+        } else if (type === "FOCUS") {
+          const a = shownAgents.get(f[0]);
+          if (!a) { send("STATUS", "That session is gone", 8); continue; }
+          focusAgent(a).then(
+            (msg) => { send("STATUS", ascii(`${msg}: ${a.title}`, 60)); log(`focus ${a.agent} ${a.where}: ${msg}`); },
+            (e) => { send("STATUS", ascii(`Can't show ${a.agent}: ${(e as Error).message}`, 60), 8); log(`focus ${a.agent} failed:`, (e as Error).message); },
+          );
         } else if (type === "PRESS") {
           const b = buttons.find((x) => x.id === f[0]);
           if (!b) { send("STATUS", `Unknown button ${f[0]}`, 8); continue; }
