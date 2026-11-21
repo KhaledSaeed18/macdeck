@@ -7,6 +7,8 @@
 //                running between its task_started and task_complete events
 //   opencode     ~/.local/share/opencode/opencode.db (SQLite, opened read-only): a session
 //                is working until its newest session_message row is an "idle" one
+//   Copilot CLI  ~/.copilot/session-state/<id>/events.jsonl: a turn runs from user.message /
+//                assistant.turn_start until assistant.turn_end (or session.shutdown)
 //
 // One rule for every agent: a session is listed while it is working or waiting for the user,
 // and for IDLE_SHOWN_MS after it went idle; then it is removed (listAgents).
@@ -30,6 +32,7 @@ const HOME = os.homedir();
 const CLAUDE_SESSIONS = path.join(HOME, ".claude", "sessions");
 const CODEX_HOME = path.join(HOME, ".codex");
 const OPENCODE_DB = path.join(HOME, ".local", "share", "opencode", "opencode.db");
+const COPILOT_SESSIONS = path.join(HOME, ".copilot", "session-state");
 const IDLE_SHOWN_MS = 30 * 60_000;  // keep an idle session on the deck this long, then drop it
 const STALE_MS = 15 * 60_000;    // a "working" session with no activity this long is assumed dead
 
@@ -170,6 +173,57 @@ function opencodeSessions(): Agent[] {
   return out;
 }
 
+// ---- JSONL session logs (Copilot): recent files, newest records first
+function recentLogs(files: string[]): { file: string; mtime: number }[] {
+  const now = Date.now(), out: { file: string; mtime: number }[] = [];
+  for (const file of files) {
+    try { const mtime = statSync(file).mtimeMs; if (now - mtime <= Math.max(IDLE_SHOWN_MS, STALE_MS)) out.push({ file, mtime }); } catch { /* gone */ }
+  }
+  return out;
+}
+function* newestRecords(file: string): Generator<Record<string, any>> {
+  for (const l of readTail(file, 256 * 1024).split("\n").reverse()) {
+    if (!l.trim()) continue;
+    try { yield JSON.parse(l); } catch { /* first, partial line of the tail */ }
+  }
+}
+function* oldestRecords(file: string): Generator<Record<string, any>> {
+  for (const l of readHead(file, 256 * 1024).split("\n")) {
+    try { yield JSON.parse(l); } catch { /* cut-off last line */ }
+  }
+}
+const listDir = (dir: string) => (existsSync(dir) ? readdirSync(dir) : []);
+const promptCache = new Map<string, string>();
+function firstPrompt(file: string, pick: (r: Record<string, any>) => unknown): string | undefined {
+  if (promptCache.has(file)) return promptCache.get(file);
+  for (const r of oldestRecords(file)) {
+    const t = pick(r);
+    const p = typeof t === "string" ? t.replace(/\s+/g, " ").trim() : "";
+    if (p.length >= 3) { promptCache.set(file, p); return p; }  // skip "y", "ok": not a useful title
+  }
+  return undefined;
+}
+
+function copilotSessions(): Agent[] {
+  const files = listDir(COPILOT_SESSIONS).map((d) => path.join(COPILOT_SESSIONS, d, "events.jsonl"));
+  const out: Agent[] = [], now = Date.now();
+  for (const { file, mtime } of recentLogs(files)) {
+    let last: Record<string, any> | undefined;
+    for (const r of newestRecords(file)) {
+      if (["user.message", "assistant.turn_start", "assistant.turn_end", "session.shutdown"].includes(r.type)) { last = r; break; }
+    }
+    if (!last) continue;
+    const working = (last.type === "user.message" || last.type === "assistant.turn_start") && now - mtime < STALE_MS;
+    let cwd = "";
+    try { cwd = /^cwd: (.*)$/m.exec(readFileSync(path.join(path.dirname(file), "workspace.yaml"), "utf8"))?.[1] ?? ""; } catch { /* none */ }
+    const where = folder(cwd);
+    out.push({ key: `copilot:${path.basename(path.dirname(file))}`, agent: "Copilot", state: working ? "working" : "idle",
+      title: firstPrompt(file, (r) => r.type === "user.message" && r.data?.content) || where || "Copilot",
+      where, since: Date.parse(last.timestamp) || mtime });
+  }
+  return out;
+}
+
 const RANK: Record<AgentState, number> = { waiting: 0, working: 1, idle: 2 };
 
 // One unreadable source (a format change after an agent update) must not hide the others.
@@ -178,7 +232,8 @@ function safe(name: string, read: () => Agent[]): Agent[] {
 }
 
 export function listAgents(): Agent[] {
-  const now = Date.now(), all = [...safe("claude", claudeSessions), ...safe("codex", codexSessions), ...safe("opencode", opencodeSessions)];
+  const now = Date.now(), all = [...safe("claude", claudeSessions), ...safe("codex", codexSessions), ...safe("opencode", opencodeSessions),
+    ...safe("copilot", copilotSessions)];
   return all.filter((a) => a.state !== "idle" || now - a.since <= IDLE_SHOWN_MS).sort((a, b) => RANK[a.state] - RANK[b.state] || b.since - a.since);
 }
 
