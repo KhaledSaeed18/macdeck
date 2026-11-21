@@ -1,5 +1,6 @@
 // MacDeck host: connects to the deck over `adb forward`, defines its buttons, streams
-// metrics + clock once a second, and runs the allowlisted action for each PRESS.
+// metrics, clock and agent sessions once a second, and runs the allowlisted action for
+// each PRESS.
 // Protocol: ../../protocol/PROTOCOL.md.   Run: node src/main.ts
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -7,11 +8,13 @@ import net from "node:net";
 import os from "node:os";
 import { promisify } from "node:util";
 import { loadButtons, MAX_BUTTONS, runAction, type ButtonDef } from "./actions.ts";
+import { AgentWatcher, ago, ascii, listAgents } from "./agents.ts";
 import { collect } from "./metrics.ts";
 
 const run = promisify(execFile);
 const LOCAL_PORT = Number(process.env.MACDECK_PORT ?? 18765);
 const DECK_PORT = 8765;
+const MAX_AGENTS = 6;   // agent cards on the deck's Agents page
 const SERIAL = process.env.MACDECK_SERIAL ?? "";
 const ADB = process.env.ADB ?? [
   `${process.env.ANDROID_HOME ?? `${os.homedir()}/Library/Android/sdk`}/platform-tools/adb`,
@@ -36,11 +39,32 @@ function session(sock: net.Socket): Promise<void> {
   return new Promise((resolve) => {
     let buf = "", lastRx = Date.now(), seq = 0, greeted = false, screenOn = true;
     const send = (...fields: (string | number)[]) => sock.write(fields.map((f) => clean(String(f))).join("|") + "\n");
+    const watcher = new AgentWatcher();
+
+    // Agent sessions: notices (and a screen wake) even while the screen is off; the cards
+    // themselves only while it is on.
+    const agentTick = () => {
+      let agents;
+      try { agents = listAgents(); } catch (e) { log("agents error:", (e as Error).message); return; }
+      for (const { agent: a, event } of watcher.update(agents)) {
+        const what = event === "waiting" ? "needs you" : "finished";
+        log(`agent ${a.agent} ${what}: ${a.where}`);
+        send("WAKE");
+        send("STATUS", ascii(`${a.agent} ${what}: ${a.title}`, 60), 15);
+      }
+      if (!screenOn) return;
+      for (let s = 0; s < MAX_AGENTS; s++) {
+        const a = agents[s];
+        if (!a) { send("AGENT", s, ""); continue; }
+        send("AGENT", s, a.agent, a.state, ascii(a.title, 28), ascii(a.where, 28), ago(a.since), ascii(a.detail ?? "", 28));
+      }
+    };
 
     const tick = async () => {
       if (!greeted) return;
       if (Date.now() - lastRx > 5000) { log("no reply from deck for 5 s, reconnecting"); sock.destroy(); return; }
-      if (!screenOn) { send("PING", ++seq); return; }  // screen off: heartbeat only
+      agentTick();
+      if (!screenOn) { send("PING", ++seq); return; }  // screen off: heartbeat (and agent notices) only
       const d = new Date();
       send("CLOCK", d.toTimeString().slice(0, 5), d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", ""));
       try {
