@@ -87,9 +87,7 @@ static void finger_move(int sx, int sy) {
     int dx = sx - down_x, dy = sy - down_y;
     if (!swiping && abs(dx) > SWIPE_START && abs(dx) > abs(dy)) { swiping = 1; pressed = -1; dirty = 1; }
     if (swiping) {
-        float d = (float)dx;
-        if ((page == 0 && d > 0) || (page == page_count() - 1 && d < 0)) d /= 4;  // rubber band at the ends
-        drag = d; dirty = 1;
+        drag = (float)dx; dirty = 1;  // pages wrap around, so there is no end to resist at
         return;
     }
     int show = page_at(page)->hit(sx, sy) == start_ctrl ? start_ctrl : -1;
@@ -98,11 +96,9 @@ static void finger_move(int sx, int sy) {
 
 static void finger_up(int sx, int sy) {
     if (swiping) {
-        int target = page;
-        if (drag < -W / 6 && page < page_count() - 1) target++;
-        if (drag > W / 6 && page > 0) target--;
-        drag += (target - page) * W;
-        page = target;
+        int step = drag < -W / 6 ? 1 : drag > W / 6 ? -1 : 0;  // past the last page comes Home, and back
+        drag += step * W;
+        page = (page + step + page_count()) % page_count();
         settle_from = drag; settle_start = now();
         logmsg("page %d (%s)", page, page_at(page)->title);
     } else if (start_ctrl >= 0 && page_at(page)->hit(sx, sy) == start_ctrl) page_at(page)->press(start_ctrl);

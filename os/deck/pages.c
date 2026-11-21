@@ -107,11 +107,11 @@ void pages_render(void) {
     gfx_noclip();
     fill(0, 0, W, H, C_BG);
     top_bar();
-    for (int p = 0; p < NPAGES; p++) {
-        int ox = (p - page) * W + (int)drag;
+    for (int k = -1; k <= 1; k++) {  // the page and its neighbours, wrapping around the ends
+        int ox = k * W + (int)drag;
         if (ox <= -W || ox >= W) continue;
-        drawing = p;
-        registry[p]->render(ox);
+        drawing = (page + k + NPAGES) % NPAGES;
+        registry[drawing]->render(ox);
     }
     gfx_noclip();
     bottom_bar();
