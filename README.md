@@ -32,22 +32,113 @@ Other devices would need their own kernel, partition layout and quirks. The appr
 
 ## How it works
 
-```
- Mac  ── USB ──  SM-T210
-                 ├─ Samsung stock kernel 3.4 (unchanged, from the device's own boot partition)
-                 └─ MacDeck ramdisk
-                      ├─ init      (Samsung's stock Android init, used only as a tiny process supervisor)
-                      ├─ ueventd   (creates /dev nodes)
-                      ├─ adbd      (development access + the USB link)
-                      └─ deck      (our program: draws to /dev/graphics/fb0, reads /dev/input/event0,
-                                    listens on 127.0.0.1:8765 for the Mac)
+The Mac does all the work: it collects metrics, owns the button layout and runs actions. The tablet runs one small C program that draws, reads touches and talks to the Mac over USB.
 
- Mac: host/ (Node + TypeScript, no dependencies)
-      adb forward tcp:18765 → tablet:8765, then speaks protocol/PROTOCOL.md:
-      sends clock + 4 metric tiles + 6 button definitions, runs allowlisted actions on PRESS
+### System overview
+
+```mermaid
+flowchart TB
+    subgraph MAC["Mac (macOS)"]
+        direction LR
+        CFG[("config.json<br/>buttons + actions")] --> HOST
+        STATE[("state.json<br/>tablet settings")] <--> HOST
+        HOST["host/ (Node + TypeScript)<br/>metrics · actions · link"] -- "allowlisted actions" --> APPS["Apps and commands<br/>Ghostty, Chrome, pmset..."]
+    end
+    subgraph TAB["SM-T210 running MacDeck OS"]
+        direction LR
+        ADBD["adbd<br/>USB transport"] -- "TCP 127.0.0.1:8765" --> DECK["deck"]
+        DECK <--> HW["fb0 · touchscreen · keys<br/>backlight · battery · cpufreq"]
+    end
+    MAC <== "USB cable · adb forward tcp:18765 → tcp:8765 · MacDeck protocol v1" ==> TAB
 ```
 
-Measured: the kernel reaches `init` at ~4.5 s and the deck is running at ~5.1 s, only 4 userspace processes run, and ~834 MB of RAM is free (stock Android idled at ~55 MB free).
+- **Transport:** plain `adb forward` over the USB cable. The Mac opens the connection; the same TCP stream carries messages both ways, so `adb reverse` (unsupported by this device's adbd) is not needed. No Wi-Fi, no cloud.
+- **Protocol:** one line per message, `|`-separated fields. See [protocol/PROTOCOL.md](protocol/PROTOCOL.md).
+- **Safety:** the deck only ever sends a button **id**. The command it maps to lives on the Mac in `config.json`, and is run with `execFile` (no shell).
+
+### Boot flow
+
+MacDeck OS replaces the tablet's main boot image. The kernel is Samsung's own; the ramdisk is ours.
+
+```mermaid
+flowchart TD
+    PWR(["Power key"]) --> BL
+    PLUG(["Charger plugged in<br/>while off"]) --> BL
+    BL{"Samsung bootloader"}
+    BL -- "normal boot" --> K
+    BL -- "androidboot.mode=charger" --> K
+    BL -. "Power + Home + Vol Up" .-> TWRP["RECOVERY: TWRP<br/>(rescue, backups)"]
+    BL -. "Power + Home + Vol Down" .-> ODIN["Download mode<br/>(Heimdall flashing)"]
+
+    subgraph K["KERNEL partition: MacDeck OS"]
+        direction TB
+        KERN["Samsung stock kernel 3.4"] --> INIT["stock init<br/>early-init: setenforce 0, start ueventd"]
+        INIT --> MODE{"boot mode?"}
+        MODE -- "charger: touchscreen<br/>not registered" --> REBOOT["powerctl reboot"]
+        MODE -- "normal" --> START["macdeck.start<br/>mount /system ro · ifup lo · USB adb"]
+        START --> SVC["start adbd + deck"]
+    end
+    REBOOT --> BL
+    SVC --> UI(["Deck on screen ~5 s after the kernel starts"])
+```
+
+Measured: the kernel reaches `init` at ~4.5 s and the deck runs at ~5.1 s. Only 4 userspace processes run (`init`, `ueventd`, `adbd`, `deck`), and ~834 MB of RAM is free (stock Android idled at ~55 MB free).
+
+### A session
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant H as Mac host
+    participant D as Deck (tablet)
+    participant U as User
+
+    H->>D: connect via adb forward
+    D->>H: HELLO|macdeck/1|deck-3.0|1024x600
+    D->>H: SCREEN|on
+    H->>D: BUTTON x12 · SETTING (saved brightness, timeouts, CPU mode)
+    loop every second
+        H->>D: CLOCK · TILE x4 · SAMPLE (cpu, mem, net_down, net_up) · PING
+        D->>H: PONG
+    end
+    U->>D: tap "Ghostty"
+    D->>H: PRESS|ghostty
+    H->>H: open -a Ghostty
+    H->>D: STATUS|Opened Ghostty (toast for 4 s)
+    U->>D: Tablet page: "Brighter"
+    D->>H: SETTING|brightness|120
+    H->>H: save to state.json
+    Note over D: idle 5 min: backlight off, back to Home
+    D->>H: SCREEN|off
+    H->>D: PING only, until SCREEN|on
+```
+
+### Inside the deck
+
+Each page is one file implementing a three-function interface on top of shared widgets. Adding a page means one new file plus one line in the registry.
+
+```mermaid
+flowchart TB
+    MAIN["main.c<br/>framebuffer · poll loop"] --> LINK["link.c<br/>TCP to the Mac"]
+    MAIN --> INPUT["input.c<br/>touch gestures · keys"]
+    MAIN --> POWER["power.c<br/>screen · backlight · CPU · battery"]
+    MAIN --> PAGES["pages.c<br/>registry · bars · swipe carousel"]
+    LINK --> MODEL["model.c<br/>tiles · buttons · history · toasts"]
+    INPUT --> PAGES
+    PAGES --> P1["page_home.c"] & P2["page_stats.c"] & P3["page_shortcuts.c"] & P4["page_tablet.c"]
+    P1 & P2 & P3 & P4 --> GFX["gfx.c<br/>tile · button · panel · meter · chart · grid"]
+    P1 & P2 & P3 --> MODEL
+    P4 --> POWER
+```
+
+```c
+typedef struct {
+    const char *title;
+    void (*render)(int ox);     // draw the content area shifted by ox (for swiping)
+    int  (*hit)(int x, int y);  // control under the finger, or -1
+    void (*press)(int i);       // activate a control
+} Page;
+```
 
 **No Samsung or third-party binaries are stored in this repository.** `scripts/build-os-image.py` extracts the kernel and the few stock ramdisk files it reuses from a dump of *your own* device's boot partition at build time.
 
