@@ -4,7 +4,7 @@ Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool but
 
 Instead of running an app on top of Android, MacDeck replaces Android's entire userspace with **MacDeck OS**: the tablet's own stock Linux kernel plus a tiny ramdisk that starts a single deck program. No Android framework, no Java, no launcher. It boots straight into the deck.
 
-> **Status: early work in progress.** MacDeck OS v3.2 is the tablet's main system. Power-on, or plugging in a powered-off tablet, boots straight into the deck.
+> **Status: early work in progress.** MacDeck OS v3.4 is the tablet's main system. Power-on, or plugging in a powered-off tablet, boots straight into the deck.
 
 ## Pages
 
