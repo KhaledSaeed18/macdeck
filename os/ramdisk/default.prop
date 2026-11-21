@@ -5,5 +5,5 @@
 ro.secure=0
 ro.adb.secure=0
 ro.debuggable=1
-ro.macdeck.version=3.2
+ro.macdeck.version=3.3
 persist.sys.usb.config=adb
