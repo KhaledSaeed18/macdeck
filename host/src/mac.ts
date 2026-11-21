@@ -1,7 +1,7 @@
-// The deck's Mac page: battery, sound, Wi-Fi, AirDrop, keep awake, dark mode and lock.
+// The deck's Mac page: battery, sound, Wi-Fi, AirDrop, dark mode and lock.
 // Everything uses tools that ship with macOS. The deck only sends a key and a value
 // (MACSET|key|value); each key maps to one fixed command here, run without a shell.
-import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { promisify } from "node:util";
 
@@ -14,7 +14,6 @@ export interface MacState {
   sound: { volume: number; muted: boolean };
   wifi: { on: boolean; detail: string };
   airdrop: "off" | "contacts" | "everyone";
-  awake: { on: boolean; detail: string };
   dark: boolean;
 }
 
@@ -79,22 +78,6 @@ async function airdrop(): Promise<MacState["airdrop"]> {
   return v === "Off" ? "off" : v === "Everyone" ? "everyone" : "contacts";
 }
 
-// ---------------------------------------------------------------- keep awake (caffeinate)
-// Display and system stay awake while the host runs (-w: caffeinate exits with the host).
-let caffeinate: ChildProcess | undefined, awakeSince = 0;
-function awake(): MacState["awake"] {
-  if (!caffeinate) return { on: false, detail: "Off" };
-  const m = Math.floor((Date.now() - awakeSince) / 60_000);  // short: it sits beside a switch on the deck
-  return { on: true, detail: m < 60 ? `On, ${m}m` : `On, ${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` };
-}
-function setAwake(on: boolean) {
-  if (on && !caffeinate) {
-    caffeinate = spawn("/usr/bin/caffeinate", ["-dim", "-w", String(process.pid)], { stdio: "ignore" });
-    awakeSince = Date.now();
-    caffeinate.on("exit", () => { caffeinate = undefined; });
-  } else if (!on && caffeinate) { caffeinate.kill(); caffeinate = undefined; }
-}
-
 // ---------------------------------------------------------------- dark mode
 async function dark(): Promise<boolean> {
   return (await sh("/usr/bin/defaults", ["read", "-g", "AppleInterfaceStyle"]).catch(() => "")).trim() === "Dark";
@@ -111,7 +94,7 @@ async function lock() {
 // ---------------------------------------------------------------- public
 export async function readMac(): Promise<MacState> {
   const [b, s, w, a, d] = await Promise.all([battery(), sound(), wifi(), airdrop(), dark()]);
-  return { battery: b, sound: s, wifi: w, airdrop: a, awake: awake(), dark: d };
+  return { battery: b, sound: s, wifi: w, airdrop: a, dark: d };
 }
 
 // Apply one control from the deck. Returns a short message for the deck's toast, if any.
@@ -133,7 +116,6 @@ export async function setMac(key: string, value: string): Promise<string | undef
       await sh("/usr/bin/killall", ["sharingd"]).catch(() => {});  // it restarts and reads the new mode
       return;
     }
-    case "awake": setAwake(on); return on ? "Mac stays awake" : "Mac sleeps as usual";
     case "dark":
       await osa(`tell application "System Events" to tell appearance preferences to set dark mode to ${on}`);
       return;

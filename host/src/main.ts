@@ -59,7 +59,6 @@ function session(sock: net.Socket): Promise<void> {
         send("MAC", "sound", m.sound.volume, m.sound.muted ? 1 : 0);
         send("MAC", "wifi", onoff(m.wifi.on), m.wifi.detail);
         send("MAC", "airdrop", m.airdrop);
-        send("MAC", "awake", onoff(m.awake.on), m.awake.detail);
         send("MAC", "dark", onoff(m.dark));
         macAt = Date.now();
       } catch (e) { log("mac state error:", (e as Error).message); }
