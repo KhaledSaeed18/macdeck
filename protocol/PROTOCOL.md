@@ -32,7 +32,7 @@ The link between the Mac host and the deck running on the tablet.
 | `CLOCK\|<time>\|<date>` | Text shown in the top bar, e.g. `CLOCK\|14:05\|Sat 21 Nov` |
 | `TILE\|<slot>\|<label>\|<value>\|<detail>\|<level>` | Metric tile, slots 0–3. `level` is 0–100 and drives the bar under the value (`-1` = no bar). |
 | `BUTTON\|<slot>\|<id>\|<label>\|<rrggbb>` | Defines button slot 0–5. An empty `id` clears the slot. |
-| `STATUS\|<text>` | One-line message in the bottom bar, e.g. the result of an action |
+| `STATUS\|<text>[\|<seconds>]` | Short-lived message (toast) in the bottom bar, e.g. the result of an action. Shown for `seconds` (default 4, max 60), then the line clears. Use ~8 s for errors. |
 | `SETTING\|<key>\|<value>` | Restore a tablet setting (the tablet has no persistent storage) |
 | `WAKE` | Turn the screen on, e.g. for a notification |
 
