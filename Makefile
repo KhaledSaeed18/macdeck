@@ -11,7 +11,7 @@ CC := $(TOOLCHAIN)/armv7a-linux-androideabi21-clang
 STRIP := $(TOOLCHAIN)/llvm-strip
 CFLAGS := -static -O2 -Wall -Wextra
 
-DECK_SRC := $(addprefix os/deck/,util.c gfx.c model.c link.c power.c pages.c \
+DECK_SRC := $(addprefix os/deck/,util.c gfx.c icons.c model.c link.c power.c pages.c \
              page_home.c page_agents.c page_stats.c page_shortcuts.c page_mac.c page_tablet.c)
 DECK_HDR := $(wildcard os/deck/*.h)
 

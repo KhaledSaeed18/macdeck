@@ -122,6 +122,12 @@ void ui_switch(Rect r, int on, int busy) {
     fill(on ? r.x + r.w - 4 - k : r.x + 4, r.y + 4, k, k, on ? 0xffffff : C_DIM);
 }
 
+void icon(const Icon *ic, int x, int y, int scale, uint32_t hex) {
+    for (int r = 0; r < ic->h; r++)
+        for (int c = 0; c < ic->w && ic->rows[r][c]; c++)
+            if (ic->rows[r][c] == '#') fill(x + c * scale, y + r * scale, scale, scale, hex);
+}
+
 void ui_segments(Rect r, const char *const *labels, int n, int sel, int pressed, int busy) {
     fill_r(r, C_BAR);
     for (int i = 0; i < n; i++) {

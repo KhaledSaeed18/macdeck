@@ -57,6 +57,10 @@ void ui_panel(Rect r, const char *label, const char *value, uint32_t value_color
 void ui_meter(Rect r, int level, uint32_t color);
 // On/off switch: a track with a square knob; `busy` fades it while a change is in flight.
 void ui_switch(Rect r, int on, int busy);
+// ---- icons: pixel art, '#' = ink (icons.c)
+typedef struct { int w, h; const char *rows[16]; } Icon;
+extern const Icon icon_off, icon_person, icon_people;
+void icon(const Icon *ic, int x, int y, int scale, uint32_t hex);
 // Segmented control: n labelled choices with `sel` filled; `pressed` (or -1) is highlighted.
 void ui_segments(Rect r, const char *const *labels, int n, int sel, int pressed, int busy);
 // Area/line chart of up to 4 series (n samples each, oldest first) on a 0..max scale.
