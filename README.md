@@ -16,7 +16,7 @@ Swipe left/right; the pages loop around (past the last page comes Home, and back
 | **Agents** | up to six coding-agent sessions (Claude Code, Codex, opencode, Copilot CLI, Qwen Code): needs you, working or idle, and for how long; tap a card to open that session on the Mac |
 | **Stats** | live charts (about 2 minutes) of CPU, memory and network down/up, plus a disk meter |
 | **Shortcuts** | up to 12 buttons that run allowlisted actions on the Mac |
-| **Mac** | a control centre for the Mac: battery (health, cycles, adapter), volume bar with mute, Wi-Fi, AirDrop, Keep Awake, Dark Mode, Lock Screen |
+| **Mac** | a control centre for the Mac: battery (health, cycles, adapter), volume bar with mute, Wi-Fi, AirDrop, Dark Mode, Lock Screen |
 | **Tablet** | battery, power draw, brightness and system readings; brightness, dim/off timeouts, CPU mode, screen off |
 
 Each page is one C file implementing a small interface (`render`, `hit`, `press`) on top of shared widgets (tile, button, panel, meter, chart, grid). Adding a page means writing one file and one registry entry.
@@ -181,8 +181,7 @@ Everything uses tools that ship with macOS; the deck only sends `MACSET|key|valu
 | Battery | `pmset -g batt`, `ioreg -rn AppleSmartBattery` (health = nominal / design capacity) | |
 | Sound | `osascript`: `get volume settings` | `set volume output volume N` (unmutes), `set volume output muted` |
 | Wi-Fi | `networksetup -getairportpower`, `ipconfig getifaddr` | `networksetup -setairportpower` |
-| AirDrop | `defaults read com.apple.sharingd DiscoverableMode` | write it, then restart `sharingd` |
-| Keep Awake | | a `caffeinate -dim -w <host pid>` child (ends with the host) |
+| AirDrop | `defaults read com.apple.sharingd DiscoverableMode` | write it, then restart `sharingd`; the deck shows three icons: off, contacts, everyone |
 | Dark Mode | `defaults read -g AppleInterfaceStyle` | System Events `appearance preferences` (macOS asks once to allow automation) |
 | Lock Screen | | `SACLockScreenImmediate()` from `login.framework` via `python3` `ctypes` |
 
