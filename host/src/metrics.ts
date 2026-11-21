@@ -81,7 +81,8 @@ async function network(): Promise<Metric> {
     up = Math.max(0, (tx - lastNet.tx) / (at - lastNet.at));
   }
   lastNet = { rx, tx, at };
-  const tile = { label: "NETWORK", value: size(down, "/s"), detail: `up ${size(up, "/s")}`, level: -1 };
+  // The unit sits in the label: with "/s" a value like "24.5K/s" is wider than a Home tile.
+  const tile = { label: "NETWORK down/s", value: size(down), detail: `up ${size(up, "/s")}`, level: -1 };
   return { tile, samples: { net_down: Math.round(down), net_up: Math.round(up) } };
 }
 
