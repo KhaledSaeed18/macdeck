@@ -154,6 +154,21 @@ Measured on the SM-T210 over a 250 mA USB port, the backlight dominates power us
 | 30 | −56 mA |
 | off | **+78 mA (charging)** |
 
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> On
+    On --> Dim: 1 min without touches
+    Dim --> Off: 5 min without touches
+    On --> Off: power key · "Screen off" · Mac gone 2 min
+    Dim --> On: touch / key (wake only)
+    Off --> On: touch / key / WAKE from the Mac
+    note right of Off
+        backlight 0, nothing rendered,
+        battery charges even on USB
+    end note
+```
+
 The deck therefore:
 - defaults to brightness 80
 - dims after 1 min idle and turns the backlight off after 5 min, or 2 min after the Mac disconnects
