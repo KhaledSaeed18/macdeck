@@ -97,7 +97,7 @@ sequenceDiagram
     participant U as User
 
     H->>D: connect via adb forward
-    D->>H: HELLO|macdeck/1|deck-3.0|1024x600
+    D->>H: HELLO|macdeck/1|deck-3.8|1024x600
     D->>H: SCREEN|on
     H->>D: BUTTON x12 · SETTING (saved brightness, timeouts, CPU mode)
     loop every second
@@ -130,12 +130,13 @@ flowchart TB
     MAIN["main.c<br/>framebuffer · poll loop"] --> LINK["link.c<br/>TCP to the Mac"]
     MAIN --> INPUT["input.c<br/>touch gestures · keys"]
     MAIN --> POWER["power.c<br/>screen · backlight · CPU · battery"]
-    MAIN --> PAGES["pages.c<br/>registry · bars · swipe carousel"]
+    MAIN --> PAGES["pages.c<br/>registry · bars · looping carousel · page picker"]
+    PAGES --> PROMPT["prompt.c<br/>agent prompt cards (modal)"]
     LINK --> MODEL["model.c<br/>tiles · buttons · history · toasts"]
     INPUT --> PAGES
-    PAGES --> P1["page_home.c"] & P5["page_agents.c"] & P2["page_stats.c"] & P3["page_shortcuts.c"] & P4["page_tablet.c"]
-    P1 & P5 & P2 & P3 & P4 --> GFX["gfx.c<br/>tile · button · panel · meter · chart · grid"]
-    P1 & P5 & P2 & P3 --> MODEL
+    PAGES --> P1["page_home.c"] & P5["page_agents.c"] & P2["page_stats.c"] & P3["page_shortcuts.c"] & P6["page_mac.c"] & P4["page_tablet.c"]
+    P1 & P5 & P2 & P3 & P6 & P4 & PROMPT --> GFX["gfx.c + icons.c<br/>tile · button · switch · segments · meter · chart · pixel-art icons"]
+    P1 & P5 & P2 & P3 & P6 --> MODEL
     P4 --> POWER
 ```
 
@@ -250,9 +251,9 @@ Without Android, the CPU governor was stuck on `userspace` at 1205 MHz. The deck
 
 | Path | What |
 |---|---|
-| `os/deck/` | The deck program (C, static, libc only): `gfx` (drawing and widgets), `model` (state and protocol), `link`, `power`, `input`, `pages` and one `page_*.c` per page, plus a Mac-side preview renderer |
+| `os/deck/` | The deck program (C, static, libc only): `gfx` (drawing and widgets), `icons` (16x16 pixel art), `model` (state and protocol), `link`, `power`, `input`, `pages` (registry, bars, page picker), `prompt` (agent prompt cards) and one `page_*.c` per page, plus a Mac-side preview renderer (`make preview`) |
 | `os/ramdisk/` | `init.rc` and `default.prop` for MacDeck OS |
-| `host/` | Mac host: metrics, agent sessions, Mac controls, button layout, actions (`config.example.json`; your own `config.json` is git-ignored) |
+| `host/` | Mac host (Node + TypeScript, no dependencies): metrics, agent sessions (`agents.ts`, `focus.ts`), Mac controls (`mac.ts`), buttons and actions (`config.example.json`; your own `config.json` is git-ignored), button icons (`icons/*.txt`), agent prompts (`hook.ts`, `prompts.ts`, `install-hook.ts`), tests (`test/`, `npm test`) |
 | `protocol/PROTOCOL.md` | The Mac ↔ deck message format (v1) |
 | `third_party/spleen/` | Spleen font license (the font is compiled into the deck) |
 | `scripts/build-os-image.py` | Builds the boot image: stock kernel + our ramdisk, stock load addresses |
@@ -268,7 +269,7 @@ Requirements: Android NDK (r28 tested; found via `ANDROID_NDK_HOME` or `~/Librar
 ```bash
 make                     # build/deck (tablet) + build/deck-preview (Mac)
 make preview             # render every page with sample data → build/preview-<page>.png
-MACDECK_STOCK_BOOT=/path/to/KERNEL.img MACDECK_VERSION=3.0 make image   # build/macdeck-os-v3.0.img
+MACDECK_STOCK_BOOT=/path/to/KERNEL.img MACDECK_VERSION=3.8 make image   # build/macdeck-os-v3.8.img
 ```
 
 `KERNEL.img` is a raw dump of the tablet's `KERNEL` partition. `scripts/backup-partitions.sh` produces one while the tablet is booted into TWRP.
@@ -281,6 +282,8 @@ Requirements: Node 22.18+ (runs the TypeScript directly) and `adb`.
 cd host
 cp config.example.json config.json   # optional: your own buttons (open-app / command actions)
 node src/main.ts                     # MACDECK_SERIAL=<serial> if several devices are attached
+npm test                             # end-to-end tests (agent prompts through the real hook)
+node src/install-hook.ts             # optional: answer Claude Code prompts on the deck (--remove to undo)
 ```
 
 The host reconnects automatically. The deck greys out when the Mac goes away.
@@ -308,8 +311,8 @@ flowchart LR
 
 1. **Back up first.** Flash TWRP to `RECOVERY`, boot it, and run `scripts/backup-partitions.sh <out-dir>`. Keep `KERNEL.img`: it is both the build input and your way back to stock Android.
 2. Download mode: Power + Home + Volume Down, then Volume Up. Once MacDeck OS is running: `adb shell setprop debug.macdeck.reboot download`.
-3. Test from the recovery slot first: `heimdall flash --RECOVERY build/macdeck-os-v3.0.img --no-reboot`, then boot it with Power + Home + Volume Down until the screen goes black, then immediately Power + Home + Volume Up.
-4. Make it the main system: `heimdall flash --KERNEL build/macdeck-os-v3.0.img --RECOVERY twrp.img`. Stock Android will no longer boot; `heimdall flash --KERNEL KERNEL.img` restores it.
+3. Test from the recovery slot first: `heimdall flash --RECOVERY build/macdeck-os-v3.8.img --no-reboot`, then boot it with Power + Home + Volume Down until the screen goes black, then immediately Power + Home + Volume Up.
+4. Make it the main system: `heimdall flash --KERNEL build/macdeck-os-v3.8.img --RECOVERY twrp.img`. Stock Android will no longer boot; `heimdall flash --KERNEL KERNEL.img` restores it.
 
 Hard-won notes:
 - Samsung's stock `init` **reboots into recovery** if it can't load `/sepolicy`, or if a `critical` service keeps crashing. With MacDeck OS in `RECOVERY` that means a boot loop, so the stock policy files are kept and no service is marked critical.
@@ -334,9 +337,13 @@ The bootloader partitions are never written, so download mode always remains ava
 - [x] MacDeck OS as the main system (`KERNEL`), TWRP kept in `RECOVERY`; plugging in a powered-off tablet starts the deck
 - [x] Swipeable pages, tablet battery/power page, brightness/dim/off/CPU controls, idle screen-off
 - [x] Home / Stats (charts) / Shortcuts / Tablet pages on a modular page interface
-- [x] AI-agent status page (Claude Code, Codex, opencode, Copilot CLI, Qwen Code): needs you / working / idle, with wake-up notices
-- [ ] Allow/Deny for agent permission prompts from the deck; tap a card to focus the session
-- [ ] More pages as needed (notifications), context-driven page switching
+- [x] AI-agent status page (Claude Code, Codex, opencode, Copilot CLI, Qwen Code): needs you / working / idle, with wake-up notices; tap a card to bring the session to the front
+- [x] Home summary, looping pages, page picker, Mac control page, pixel-art icons on every shortcut
+- [x] Answer agent prompts on the deck: permissions (Allow / Always / Deny), questions (single and multi-choice), plan approval
+- [ ] `macdeck notify` command: any script can put a message on the deck
+- [ ] Dev page: branches, uncommitted work and pull request checks for chosen repos
+- [ ] Start the host automatically on Mac login
+- [ ] Smaller: follow the Mac's lock/sleep, icons on the page picker and the Mac/Tablet pages, context-driven page switching
 - [ ] Wi-Fi transport (tablet on a wall charger)
 
 ## License
