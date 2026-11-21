@@ -176,7 +176,7 @@ The host reads what the agents already write to disk. Nothing is installed into 
 
 Each button in `host/config.json` can name an icon: `"icon": "ghost"` uses `host/icons/ghost.txt`, 16 lines of 16 `#` (ink) or `.` (empty). The host sends it to the deck, which draws it at 3x above the label on Home and Shortcuts. Adding an icon is a new text file and a host restart, no reflash.
 
-Included (original pixel art, not app logos): `spark`, `code`, `ghost`, `letter-z`, `letter-n`, `globe`, `notes`, `calculator`, `folder`, `gear`, `chart`, `moon`, `terminal`.
+Included (original pixel art, not app logos): `spark`, `code`, `ghost`, `letter-z`, `letter-n`, `globe`, `notes`, `calendar`, `calculator`, `folder`, `gear`, `chart`, `moon`, `terminal`.
 
 ## Mac page
 
