@@ -1,6 +1,6 @@
 # MacDeck
 
-Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool buttons, live system metrics, and the status of AI coding agents (Claude Code, Codex). The Mac does all the real work; the tablet is only a fast, always-on display and touch surface.
+Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool buttons, live system metrics, and the status of AI coding agents (Claude Code, Codex, opencode). The Mac does all the real work; the tablet is only a fast, always-on display and touch surface.
 
 Instead of running an app on top of Android, MacDeck replaces Android's entire userspace with **MacDeck OS**: the tablet's own stock Linux kernel plus a tiny ramdisk that starts a single deck program. No Android framework, no Java, no launcher. It boots straight into the deck.
 
@@ -13,7 +13,7 @@ Swipe left/right; the dots in the bottom bar show the position. The deck returns
 | Page | What it shows |
 |---|---|
 | **Home** | four headline Mac metrics and four pinned shortcuts |
-| **Agents** | up to six Claude Code and Codex sessions: needs you, working or idle, and for how long |
+| **Agents** | up to six Claude Code, Codex and opencode sessions: needs you, working or idle, and for how long |
 | **Stats** | live charts (about 2 minutes) of CPU, memory and network down/up, plus a disk meter |
 | **Shortcuts** | up to 12 buttons that run allowlisted actions on the Mac |
 | **Tablet** | battery, power draw, brightness and system readings; brightness, dim/off timeouts, CPU mode, screen off |
@@ -44,7 +44,7 @@ flowchart TB
         CFG[("config.json<br/>buttons + actions")] --> HOST
         STATE[("state.json<br/>tablet settings")] <--> HOST
         HOST["host/ (Node + TypeScript)<br/>metrics · agents · actions · link"] -- "allowlisted actions" --> APPS["Apps and commands<br/>Ghostty, Chrome, pmset..."]
-        AGENTS[("~/.claude/sessions<br/>~/.codex/sessions")] -- "read only" --> HOST
+        AGENTS[("~/.claude/sessions<br/>~/.codex/sessions<br/>opencode.db")] -- "read only" --> HOST
     end
     subgraph TAB["SM-T210 running MacDeck OS"]
         direction LR
@@ -153,9 +153,12 @@ The host reads what the agents already write to disk. Nothing is installed into 
 | Agent | Source | States |
 |---|---|---|
 | Claude Code (CLI and desktop) | `~/.claude/sessions/<pid>.json`, one file per running session | `busy`/`shell` → working, `waiting` → needs you, `idle` |
-| Codex | the newest `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` logs; titles from `session_index.jsonl` | a turn runs between `task_started` and `task_complete` |
+| Codex (CLI and desktop) | the newest `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` logs; titles from `session_index.jsonl`, else the first prompt | a turn runs between `task_started` and `task_complete` |
+| opencode | `~/.local/share/opencode/opencode.db` (SQLite, opened read-only with Node's built-in `node:sqlite`) | working until the session's newest message is an `idle` one |
 
-- Claude sessions are shown while their process is alive. Codex threads are shown while a turn is running and for 30 minutes after the last activity.
+- Up to six cards, sorted: needs you, then working, then idle; within each, the most recent first. Anything beyond six is not shown.
+- Claude sessions are shown while their process is alive, idle or not. Codex and opencode don't keep a process per session, so their sessions are shown while working and for 30 minutes after the last activity. A session that claims to be working but has been silent for 15 minutes is treated as idle.
+- Only Claude Code reports "needs you". Codex and opencode don't write permission waits to disk.
 - When a session starts waiting for you, or finishes a turn, the host wakes the screen and shows a toast for 15 s (even if the screen was off). A new state has to hold for two polls in a row, to ignore flicker.
 - Both sources are internal formats of those tools and may change between versions. The reader skips what it cannot parse.
 
@@ -284,7 +287,7 @@ The bootloader partitions are never written, so download mode always remains ava
 - [x] MacDeck OS as the main system (`KERNEL`), TWRP kept in `RECOVERY`; plugging in a powered-off tablet starts the deck
 - [x] Swipeable pages, tablet battery/power page, brightness/dim/off/CPU controls, idle screen-off
 - [x] Home / Stats (charts) / Shortcuts / Tablet pages on a modular page interface
-- [x] AI-agent status page (Claude Code, Codex): needs you / working / idle, with wake-up notices
+- [x] AI-agent status page (Claude Code, Codex, opencode): needs you / working / idle, with wake-up notices
 - [ ] Allow/Deny for agent permission prompts from the deck; tap a card to focus the session
 - [ ] More pages as needed (notifications), context-driven page switching
 - [ ] Wi-Fi transport (tablet on a wall charger)
