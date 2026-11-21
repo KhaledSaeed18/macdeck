@@ -55,5 +55,9 @@ enum { BTN_NORMAL, BTN_PRESSED, BTN_DISABLED };
 void ui_button(Rect r, const char *label, uint32_t color, int state);
 void ui_panel(Rect r, const char *label, const char *value, uint32_t value_color);
 void ui_meter(Rect r, int level, uint32_t color);
+// On/off switch: a track with a square knob; `busy` fades it while a change is in flight.
+void ui_switch(Rect r, int on, int busy);
+// Segmented control: n labelled choices with `sel` filled; `pressed` (or -1) is highlighted.
+void ui_segments(Rect r, const char *const *labels, int n, int sel, int pressed, int busy);
 // Area/line chart of up to 4 series (n samples each, oldest first) on a 0..max scale.
 void ui_chart(Rect r, const float *const *series, const int *counts, const uint32_t *colors, int nseries, float max);

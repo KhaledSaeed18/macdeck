@@ -115,6 +115,23 @@ void ui_meter(Rect r, int level, uint32_t color) {
     fill(r.x, r.y, r.w * lv / 100, r.h, color);
 }
 
+void ui_switch(Rect r, int on, int busy) {
+    uint32_t track = on ? C_ACCENT : C_MUTED;
+    fill_r(r, busy ? mix(track, C_PANEL, 45) : track);
+    int k = r.h - 8;
+    fill(on ? r.x + r.w - 4 - k : r.x + 4, r.y + 4, k, k, on ? 0xffffff : C_DIM);
+}
+
+void ui_segments(Rect r, const char *const *labels, int n, int sel, int pressed, int busy) {
+    fill_r(r, C_BAR);
+    for (int i = 0; i < n; i++) {
+        Rect c = grid_cell(inset(r, 4), n, 1, 4, i);
+        if (i == sel) fill_r(c, busy ? mix(C_ACCENT, C_BAR, 45) : C_ACCENT);
+        else if (i == pressed) fill_r(c, mix(C_BAR, C_TEXT, 18));
+        text_center(&font_s, c, labels[i], i == sel ? C_INK : C_TEXT);
+    }
+}
+
 // Label, big value, optional level bar and a detail line; matches the original deck tiles.
 void ui_tile(Rect r, const char *label, const char *value, const char *detail, int level, int flags) {
     fill_r(r, C_PANEL);
