@@ -14,7 +14,7 @@
 
 #include "gfx.h"
 
-#define BUILD "deck-3.0"
+#define BUILD "deck-3.1"
 #define TOP 56          // top bar height
 #define BOTTOM 40       // bottom bar height
 #define MAX_TILES 4
@@ -90,7 +90,7 @@ typedef struct {
     void (*press)(int i);          // activate control i
 } Page;
 
-extern const Page page_home, page_stats, page_shortcuts, page_tablet;
+extern const Page page_home, page_agents, page_stats, page_shortcuts, page_tablet;
 extern int page, pressed;          // current page; pressed control on it (-1 = none)
 extern float drag;                 // horizontal offset while swiping / settling
 int  page_count(void);
