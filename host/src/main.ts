@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 import { loadButtons, MAX_BUTTONS, runAction, type ButtonDef } from "./actions.ts";
 import { AgentWatcher, ago, ascii, listAgents, type Agent } from "./agents.ts";
 import { focusAgent } from "./focus.ts";
+import { readMac, setMac } from "./mac.ts";
 import { collect } from "./metrics.ts";
 
 const run = promisify(execFile);
@@ -45,6 +46,27 @@ function session(sock: net.Socket): Promise<void> {
     const watcher = new AgentWatcher();
     let shownAgents = new Map<string, Agent>();  // id -> session, for FOCUS taps
 
+    // The Mac page: state every 2 s while the screen is on, and right after each change.
+    let macBusy = false, macAgain = false, macAt = 0;
+    const macTick = async (force = false): Promise<void> => {
+      if (macBusy) { macAgain ||= force; return; }  // a change arrived mid-read: read once more after
+      if (!force && Date.now() - macAt < 2000) return;
+      macBusy = true;
+      try {
+        const m = await readMac();
+        const b = m.battery, onoff = (v: boolean) => (v ? "on" : "off");
+        send("MAC", "battery", b.pct, b.charging ? 1 : 0, b.source, b.line, b.detail);
+        send("MAC", "sound", m.sound.volume, m.sound.muted ? 1 : 0);
+        send("MAC", "wifi", onoff(m.wifi.on), m.wifi.detail);
+        send("MAC", "airdrop", m.airdrop);
+        send("MAC", "awake", onoff(m.awake.on), m.awake.detail);
+        send("MAC", "dark", onoff(m.dark));
+        macAt = Date.now();
+      } catch (e) { log("mac state error:", (e as Error).message); }
+      finally { macBusy = false; }
+      if (macAgain) { macAgain = false; return macTick(true); }
+    };
+
     // Agent sessions: notices (and a screen wake) even while the screen is off; the cards
     // themselves only while it is on.
     const agentTick = () => {
@@ -76,6 +98,7 @@ function session(sock: net.Socket): Promise<void> {
       if (Date.now() - lastRx > 5000) { log("no reply from deck for 5 s, reconnecting"); sock.destroy(); return; }
       agentTick();
       if (!screenOn) { send("PING", ++seq); return; }  // screen off: heartbeat (and agent notices) only
+      void macTick();
       const d = new Date();
       send("CLOCK", d.toTimeString().slice(0, 5), d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", ""));
       try {
@@ -114,6 +137,12 @@ function session(sock: net.Socket): Promise<void> {
           if (on !== screenOn) log(`tablet screen ${f[0]}`);
           screenOn = on;
           if (on) void tick();
+        } else if (type === "MACSET" && f.length >= 2) {
+          log(`mac ${f[0]}=${f[1]}`);
+          setMac(f[0], f[1]).then(
+            (msg) => { if (msg) send("STATUS", msg); },
+            (e) => { send("STATUS", ascii(`Mac ${f[0]} failed: ${(e as Error).message}`, 60), 8); log(`mac ${f[0]} failed:`, (e as Error).message); },
+          ).finally(() => void macTick(true));
         } else if (type === "FOCUS") {
           const a = shownAgents.get(f[0]);
           if (!a) { send("STATUS", "That session is gone", 8); continue; }
