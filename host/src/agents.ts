@@ -5,9 +5,16 @@
 //                status: busy | shell | waiting | idle (internal format, may change)
 //   Codex        ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl   session log; a turn is
 //                running between its task_started and task_complete events
+//   opencode     ~/.local/share/opencode/opencode.db (SQLite, opened read-only): a session
+//                is working until its newest session_message row is an "idle" one
+//
+// Claude sessions are listed while their process runs. Codex and opencode have no live
+// process per session, so their sessions are listed while working and for RECENT_MS after
+// the last activity.
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 export type AgentState = "working" | "waiting" | "idle";
 export interface Agent {
@@ -23,8 +30,9 @@ export interface Agent {
 const HOME = os.homedir();
 const CLAUDE_SESSIONS = path.join(HOME, ".claude", "sessions");
 const CODEX_HOME = path.join(HOME, ".codex");
-const CODEX_IDLE_SHOWN_MS = 30 * 60_000;   // keep an idle Codex thread on the deck this long
-const CODEX_STALE_MS = 15 * 60_000;        // a "running" turn with no log activity this long is assumed dead
+const OPENCODE_DB = path.join(HOME, ".local", "share", "opencode", "opencode.db");
+const RECENT_MS = 30 * 60_000;   // keep an idle Codex / opencode session on the deck this long
+const STALE_MS = 15 * 60_000;    // a "working" session with no activity this long is assumed dead
 
 const alive = (pid: number) => {
   try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; }
@@ -116,7 +124,7 @@ function codexSessions(): Agent[] {
       const file = path.join(dir, f);
       let mtime: number;
       try { mtime = statSync(file).mtimeMs; } catch { continue; }
-      if (now - mtime > Math.max(CODEX_IDLE_SHOWN_MS, CODEX_STALE_MS)) continue;
+      if (now - mtime > Math.max(RECENT_MS, STALE_MS)) continue;
       let meta = metaCache.get(file);
       if (!meta?.prompt) {                    // re-read until the prompt has been written
         meta = codexMeta(file);
@@ -131,8 +139,8 @@ function codexSessions(): Agent[] {
           if (t === "task_started" || t === "task_complete") { last = { type: t, at: Date.parse(o.timestamp) || mtime }; break; }
         } catch { /* first, partial line of the tail */ }
       }
-      const running = last?.type === "task_started" && now - mtime < CODEX_STALE_MS;
-      if (!running && now - mtime > CODEX_IDLE_SHOWN_MS) continue;
+      const running = last?.type === "task_started" && now - mtime < STALE_MS;
+      if (!running && now - mtime > RECENT_MS) continue;
       const where = folder(meta.cwd);
       out.push({ key: `codex:${meta.id}`, agent: "Codex", state: running ? "working" : "idle",
         title: codexTitle(meta.id) || meta.prompt || where || "Codex", where, since: last?.at ?? mtime });
@@ -141,10 +149,37 @@ function codexSessions(): Agent[] {
   return out;
 }
 
+// ---- opencode (top-level sessions only; subagent sessions have a parent_id)
+let opencodeQuery: StatementSync | undefined;
+function opencodeSessions(): Agent[] {
+  if (!existsSync(OPENCODE_DB)) return [];
+  opencodeQuery ??= new DatabaseSync(OPENCODE_DB, { readOnly: true }).prepare(`
+    SELECT s.id, s.title, s.directory,
+      (SELECT type FROM session_message m WHERE m.session_id = s.id ORDER BY seq DESC LIMIT 1) AS last,
+      (SELECT max(time_updated) FROM session_message m WHERE m.session_id = s.id) AS active,
+      (SELECT max(time_created) FROM session_message m WHERE m.session_id = s.id AND type = 'user') AS asked
+    FROM session_v2 s
+    WHERE s.parent_id IS NULL AND s.time_archived IS NULL AND s.time_updated > ?`);
+  const now = Date.now(), out: Agent[] = [];
+  for (const r of opencodeQuery.all(now - RECENT_MS) as Record<string, string | number | null>[]) {
+    const active = Number(r.active ?? 0), working = r.last !== null && r.last !== "idle" && now - active < STALE_MS;
+    if (!working && now - active > RECENT_MS) continue;
+    const where = folder(r.directory);
+    out.push({ key: `opencode:${r.id}`, agent: "opencode", state: working ? "working" : "idle",
+      title: String(r.title || where || "opencode"), where, since: working ? Number(r.asked ?? active) : active });
+  }
+  return out;
+}
+
 const RANK: Record<AgentState, number> = { waiting: 0, working: 1, idle: 2 };
 
+// One unreadable source (a format change after an agent update) must not hide the others.
+function safe(name: string, read: () => Agent[]): Agent[] {
+  try { return read(); } catch (e) { console.warn(`agents: ${name}: ${(e as Error).message}`); return []; }
+}
+
 export function listAgents(): Agent[] {
-  const all = [...claudeSessions(), ...codexSessions()];
+  const all = [...safe("claude", claudeSessions), ...safe("codex", codexSessions), ...safe("opencode", opencodeSessions)];
   return all.sort((a, b) => RANK[a.state] - RANK[b.state] || b.since - a.since);
 }
 
