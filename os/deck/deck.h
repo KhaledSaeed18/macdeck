@@ -14,12 +14,12 @@
 
 #include "gfx.h"
 
-#define BUILD "deck-3.1"
+#define BUILD "deck-3.2"
 #define TOP 56          // top bar height
 #define BOTTOM 40       // bottom bar height
 #define MAX_TILES 4
 #define MAX_BUTTONS 12
-#define HOME_BUTTONS 4
+#define HOME_BUTTONS 3   // pinned shortcuts on Home, in one column
 #define MAX_AGENTS 6    // agent session cards (Agents page)
 #define HISTORY 120     // samples kept per series (~2 min at 1/s)
 
