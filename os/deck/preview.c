@@ -48,6 +48,14 @@ int main(int argc, char **argv) {
                           {"calculator", "Calculator", "8fd3ff"}, {"activity", "Activity", "f5a623"},
                           {"finder", "Finder", "b48cf2"}, {"sleep-display", "Screen Off", "e6465a"}};
     for (int i = 0; i < 7; i++) feed("BUTTON|%d|%s|%s|%s%s", i, b[i][0], b[i][1], b[i][2], i < 4 ? "|home" : "");
+    const char *icons[] = {"000007e01ff83ffc399c799e799e7ffe7ffe7ffe7ffe7ffe7ffe73ce61860000",
+                           "00000180018003c003c007e01ff8ffffffff1ff807e003c003c0018001800000",
+                           "000007e01ff8399c62466426c423ffffffffc42364266246399c1ff807e00000",
+                           "00003ffc3ffc300c300c3ffc333c333c3ffc333c333c3ffc333c333c3ffc0000",
+                           "00000006000600060066006600660666066606666666666666666666ffff0000",
+                           "000000007e007f007ffe7ffe40027ffe7ffe7ffe7ffe7ffe7ffe7ffe00000000",
+                           "000002000e001c003c007c007c007c007e007e007f803ff81ff00fe003800000"};  // ghost spark globe calculator chart folder moon (host/icons)
+    for (int i = 0; i < 7; i++) feed("ICON|button|%d|%s", i, icons[i]);
     for (int i = 0; i < HISTORY; i++) {  // two minutes of plausible history
         feed("SAMPLE|cpu|%.1f", 22 + 14 * sin(i / 9.0) + 9 * sin(i / 2.3));
         feed("SAMPLE|mem|%.1f", 68 + 3 * sin(i / 20.0));
