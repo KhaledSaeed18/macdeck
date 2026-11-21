@@ -79,11 +79,11 @@ function session(sock: net.Socket): Promise<void> {
           if (on) void tick();
         } else if (type === "PRESS") {
           const b = buttons.find((x) => x.id === f[0]);
-          if (!b) { send("STATUS", `Unknown button ${f[0]}`); continue; }
+          if (!b) { send("STATUS", `Unknown button ${f[0]}`, 8); continue; }
           log(`press: ${b.id}`);
           runAction(b).then(
             (msg) => { send("STATUS", msg); log(msg); },
-            (e) => { send("STATUS", `${b.label} failed`); log(`${b.id} failed:`, (e as Error).message); },
+            (e) => { send("STATUS", `${b.label} failed`, 8); log(`${b.id} failed:`, (e as Error).message); },
           );
         }
       }
