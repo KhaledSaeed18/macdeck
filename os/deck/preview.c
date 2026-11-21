@@ -52,6 +52,10 @@ int main(int argc, char **argv) {
         feed("SAMPLE|net_down|%.0f", 300000 + 900000 * pow(sin(i / 13.0), 2));
         feed("SAMPLE|net_up|%.0f", 40000 + 60000 * pow(sin(i / 7.0), 2));
     }
+    feed("AGENT|0|Claude|waiting|Refactor the parser|my-app|12s|permission");
+    feed("AGENT|1|Claude|working|Add the settings page|my-app|3m|");
+    feed("AGENT|2|Codex|working|Fix flaky upload test|backend|48s|");
+    feed("AGENT|3|Claude|idle|Write release notes|docs-site|25m|");
     toast("Opened Calculator", 4);
     pages_render();
     printf("wrote %s (%s)\n", out_path, page_at(page)->title);
