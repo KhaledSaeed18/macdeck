@@ -28,7 +28,12 @@ export interface Agent {
   where: string;          // project folder name
   since: number;          // ms epoch when the current state began
   detail?: string;        // what it is waiting for, if known
+  focus: FocusHint;       // how to find the app that shows this session (focus.ts)
 }
+
+// The session's own process if known; else a running process matching `proc` whose working
+// folder is `cwd`; else the desktop `app` the session belongs to.
+export interface FocusHint { pid?: number; cwd?: string; proc?: RegExp; app?: string }
 
 const HOME = os.homedir();
 const CLAUDE_SESSIONS = path.join(HOME, ".claude", "sessions");
@@ -61,6 +66,7 @@ function claudeSessions(): Agent[] {
       title: typeof s.name === "string" && s.name ? s.name : where || "Claude Code",
       where, since: Number(s.statusUpdatedAt ?? s.updatedAt ?? s.startedAt ?? Date.now()),
       detail: typeof s.waitingFor === "string" ? s.waitingFor : undefined,
+      focus: { pid },
     });
   }
   return out;
@@ -85,11 +91,11 @@ function readHead(file: string, bytes: number): string {
 
 // A Codex thread's meta line, and its first real prompt (skipping the injected <...> context
 // blocks): the title for threads without a name, such as `codex exec` runs.
-interface CodexMeta { id: string; cwd: string; prompt?: string }
+interface CodexMeta { id: string; cwd: string; desktop: boolean; prompt?: string }
 function codexMeta(file: string): CodexMeta | undefined {
   const lines = readHead(file, 512 * 1024).split("\n");
   let meta: CodexMeta;
-  try { const p = JSON.parse(lines[0]).payload; meta = { id: String(p.id), cwd: String(p.cwd ?? "") }; } catch { return undefined; }
+  try { const p = JSON.parse(lines[0]).payload; meta = { id: String(p.id), cwd: String(p.cwd ?? ""), desktop: p.originator === "Codex Desktop" }; } catch { return undefined; }
   for (const l of lines) {
     if (!l.includes('"role":"user"')) continue;
     try {
@@ -148,7 +154,8 @@ function codexSessions(): Agent[] {
       if (!running && now - mtime > IDLE_SHOWN_MS) continue;
       const where = folder(meta.cwd);
       out.push({ key: `codex:${meta.id}`, agent: "Codex", state: running ? "working" : "idle",
-        title: codexTitle(meta.id) || meta.prompt || where || "Codex", where, since: last?.at ?? mtime });
+        title: codexTitle(meta.id) || meta.prompt || where || "Codex", where, since: last?.at ?? mtime,
+        focus: meta.desktop ? { app: "ChatGPT" } : { cwd: meta.cwd, proc: /(^|\/)codex( |$)/ } });
     }
   }
   return out;
@@ -171,7 +178,8 @@ function opencodeSessions(): Agent[] {
     if (!working && now - active > IDLE_SHOWN_MS) continue;
     const where = folder(r.directory);
     out.push({ key: `opencode:${r.id}`, agent: "opencode", state: working ? "working" : "idle",
-      title: String(r.title || where || "opencode"), where, since: working ? Number(r.asked ?? active) : active });
+      title: String(r.title || where || "opencode"), where, since: working ? Number(r.asked ?? active) : active,
+      focus: { cwd: String(r.directory ?? ""), proc: /(^|\/)opencode( |$)/, app: "OpenCode" } });
   }
   return out;
 }
@@ -222,7 +230,7 @@ function copilotSessions(): Agent[] {
     const where = folder(cwd);
     out.push({ key: `copilot:${path.basename(path.dirname(file))}`, agent: "Copilot", state: working ? "working" : "idle",
       title: firstPrompt(file, (r) => r.type === "user.message" && r.data?.content) || where || "Copilot",
-      where, since: Date.parse(last.timestamp) || mtime });
+      where, since: Date.parse(last.timestamp) || mtime, focus: { cwd, proc: /(^|\/)copilot( |$)/ } });
   }
   return out;
 }
@@ -240,7 +248,7 @@ function qwenSessions(): Agent[] {
     const where = folder(last.cwd);
     out.push({ key: `qwen:${last.sessionId ?? file}`, agent: "Qwen", state: working ? "working" : "idle",
       title: firstPrompt(file, (r) => r.type === "user" && r.message?.parts?.find((p: { text?: string }) => p.text)?.text) || where || "Qwen",
-      where, since: Date.parse(last.timestamp) || mtime });
+      where, since: Date.parse(last.timestamp) || mtime, focus: { cwd: String(last.cwd ?? ""), proc: /(^|\/)qwen( |$)/ } });
   }
   return out;
 }
