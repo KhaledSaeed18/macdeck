@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
     feed("TILE|0|CPU|23%%|10 cores ld 2.1|23");
     feed("TILE|1|MEMORY|11.2G|of 16.0G used|70");
     feed("TILE|2|DISK FREE|21.8G|of 228G|90");
-    feed("TILE|3|NETWORK|1.2M/s|up 84.0K/s|-1");
+    feed("TILE|3|NETWORK down/s|99.9K|up 84.0K/s|-1");
     const char *b[][3] = {{"ghostty", "Ghostty", "63dab4"}, {"claude", "Claude", "e8a87c"}, {"chrome", "Chrome", "4287f5"},
                           {"calculator", "Calculator", "8fd3ff"}, {"activity", "Activity", "f5a623"},
                           {"finder", "Finder", "b48cf2"}, {"sleep-display", "Screen Off", "e6465a"}};
