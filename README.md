@@ -1,6 +1,6 @@
 # MacDeck
 
-Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool buttons, live system metrics, and (later) AI coding-agent status. The Mac does all the real work; the tablet is only a fast, always-on display and touch surface.
+Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool buttons, live system metrics, and the status of AI coding agents (Claude Code, Codex). The Mac does all the real work; the tablet is only a fast, always-on display and touch surface.
 
 Instead of running an app on top of Android, MacDeck replaces Android's entire userspace with **MacDeck OS**: the tablet's own stock Linux kernel plus a tiny ramdisk that starts a single deck program. No Android framework, no Java, no launcher. It boots straight into the deck.
 
@@ -13,6 +13,7 @@ Swipe left/right; the dots in the bottom bar show the position. The deck returns
 | Page | What it shows |
 |---|---|
 | **Home** | four headline Mac metrics and four pinned shortcuts |
+| **Agents** | up to six Claude Code and Codex sessions: needs you, working or idle, and for how long |
 | **Stats** | live charts (about 2 minutes) of CPU, memory and network down/up, plus a disk meter |
 | **Shortcuts** | up to 12 buttons that run allowlisted actions on the Mac |
 | **Tablet** | battery, power draw, brightness and system readings; brightness, dim/off timeouts, CPU mode, screen off |
@@ -42,7 +43,8 @@ flowchart TB
         direction LR
         CFG[("config.json<br/>buttons + actions")] --> HOST
         STATE[("state.json<br/>tablet settings")] <--> HOST
-        HOST["host/ (Node + TypeScript)<br/>metrics · actions · link"] -- "allowlisted actions" --> APPS["Apps and commands<br/>Ghostty, Chrome, pmset..."]
+        HOST["host/ (Node + TypeScript)<br/>metrics · agents · actions · link"] -- "allowlisted actions" --> APPS["Apps and commands<br/>Ghostty, Chrome, pmset..."]
+        AGENTS[("~/.claude/sessions<br/>~/.codex/sessions")] -- "read only" --> HOST
     end
     subgraph TAB["SM-T210 running MacDeck OS"]
         direction LR
@@ -98,13 +100,15 @@ sequenceDiagram
     D->>H: SCREEN|on
     H->>D: BUTTON x12 · SETTING (saved brightness, timeouts, CPU mode)
     loop every second
-        H->>D: CLOCK · TILE x4 · SAMPLE (cpu, mem, net_down, net_up) · PING
+        H->>D: CLOCK · TILE x4 · SAMPLE (cpu, mem, net_down, net_up) · AGENT x6 · PING
         D->>H: PONG
     end
     U->>D: tap "Ghostty"
     D->>H: PRESS|ghostty
     H->>H: open -a Ghostty
     H->>D: STATUS|Opened Ghostty (toast for 4 s)
+    Note over H: a Claude Code session starts waiting for permission
+    H->>D: WAKE · STATUS|Claude needs you: ... (toast for 15 s)
     U->>D: Tablet page: "Brighter"
     D->>H: SETTING|brightness|120
     H->>H: save to state.json
@@ -125,9 +129,9 @@ flowchart TB
     MAIN --> PAGES["pages.c<br/>registry · bars · swipe carousel"]
     LINK --> MODEL["model.c<br/>tiles · buttons · history · toasts"]
     INPUT --> PAGES
-    PAGES --> P1["page_home.c"] & P2["page_stats.c"] & P3["page_shortcuts.c"] & P4["page_tablet.c"]
-    P1 & P2 & P3 & P4 --> GFX["gfx.c<br/>tile · button · panel · meter · chart · grid"]
-    P1 & P2 & P3 --> MODEL
+    PAGES --> P1["page_home.c"] & P5["page_agents.c"] & P2["page_stats.c"] & P3["page_shortcuts.c"] & P4["page_tablet.c"]
+    P1 & P5 & P2 & P3 & P4 --> GFX["gfx.c<br/>tile · button · panel · meter · chart · grid"]
+    P1 & P5 & P2 & P3 --> MODEL
     P4 --> POWER
 ```
 
@@ -141,6 +145,19 @@ typedef struct {
 ```
 
 **No Samsung or third-party binaries are stored in this repository.** `scripts/build-os-image.py` extracts the kernel and the few stock ramdisk files it reuses from a dump of *your own* device's boot partition at build time.
+
+## Agent status
+
+The host reads what the agents already write to disk. Nothing is installed into their configuration, and no hooks are added.
+
+| Agent | Source | States |
+|---|---|---|
+| Claude Code (CLI and desktop) | `~/.claude/sessions/<pid>.json`, one file per running session | `busy`/`shell` → working, `waiting` → needs you, `idle` |
+| Codex | the newest `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` logs; titles from `session_index.jsonl` | a turn runs between `task_started` and `task_complete` |
+
+- Claude sessions are shown while their process is alive. Codex threads are shown while a turn is running and for 30 minutes after the last activity.
+- When a session starts waiting for you, or finishes a turn, the host wakes the screen and shows a toast for 15 s (even if the screen was off). A new state has to hold for two polls in a row, to ignore flicker.
+- Both sources are internal formats of those tools and may change between versions. The reader skips what it cannot parse.
 
 ## Power management
 
@@ -185,7 +202,7 @@ Without Android, the CPU governor was stuck on `userspace` at 1205 MHz. The deck
 |---|---|
 | `os/deck/` | The deck program (C, static, libc only): `gfx` (drawing and widgets), `model` (state and protocol), `link`, `power`, `input`, `pages` and one `page_*.c` per page, plus a Mac-side preview renderer |
 | `os/ramdisk/` | `init.rc` and `default.prop` for MacDeck OS |
-| `host/` | Mac host: metrics, button layout, actions (`config.example.json`; your own `config.json` is git-ignored) |
+| `host/` | Mac host: metrics, agent sessions, button layout, actions (`config.example.json`; your own `config.json` is git-ignored) |
 | `protocol/PROTOCOL.md` | The Mac ↔ deck message format (v1) |
 | `third_party/spleen/` | Spleen font license (the font is compiled into the deck) |
 | `scripts/build-os-image.py` | Builds the boot image: stock kernel + our ramdisk, stock load addresses |
@@ -267,8 +284,9 @@ The bootloader partitions are never written, so download mode always remains ava
 - [x] MacDeck OS as the main system (`KERNEL`), TWRP kept in `RECOVERY`; plugging in a powered-off tablet starts the deck
 - [x] Swipeable pages, tablet battery/power page, brightness/dim/off/CPU controls, idle screen-off
 - [x] Home / Stats (charts) / Shortcuts / Tablet pages on a modular page interface
-- [ ] More pages as needed (agent status, notifications), context-driven page switching
-- [ ] AI-agent status (Claude Code, Codex, …)
+- [x] AI-agent status page (Claude Code, Codex): needs you / working / idle, with wake-up notices
+- [ ] Allow/Deny for agent permission prompts from the deck; tap a card to focus the session
+- [ ] More pages as needed (notifications), context-driven page switching
 - [ ] Wi-Fi transport (tablet on a wall charger)
 
 ## License
