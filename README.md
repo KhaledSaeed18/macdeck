@@ -4,7 +4,7 @@ Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool but
 
 Instead of running an app on top of Android, MacDeck replaces Android's entire userspace with **MacDeck OS**: the tablet's own stock Linux kernel plus a tiny ramdisk that starts a single deck program. No Android framework, no Java, no launcher. It boots straight into the deck.
 
-> **Status: early work in progress.** MacDeck OS v1.2 boots straight into the deck. The deck shows live Mac metrics, and its buttons run actions on the Mac over USB.
+> **Status: early work in progress.** MacDeck OS v1.4 is the tablet's main system. Power-on, or plugging in a powered-off tablet, boots straight into the deck. The deck shows live Mac metrics, and its buttons run actions on the Mac over USB.
 
 ## Target hardware
 
@@ -60,7 +60,7 @@ Requirements: Android NDK (r28 tested; found via `ANDROID_NDK_HOME` or `~/Librar
 ```bash
 make                     # build/deck (tablet) + build/deck-preview (Mac)
 make preview             # render the deck UI with sample data → build/preview.png
-MACDECK_STOCK_BOOT=/path/to/KERNEL.img MACDECK_VERSION=1.2 make image   # build/macdeck-os-v1.2.img
+MACDECK_STOCK_BOOT=/path/to/KERNEL.img MACDECK_VERSION=1.4 make image   # build/macdeck-os-v1.4.img
 ```
 
 `KERNEL.img` is a raw dump of the tablet's `KERNEL` partition. `scripts/backup-partitions.sh` produces one while the tablet is booted into TWRP.
@@ -81,20 +81,21 @@ The host reconnects automatically. The deck greys out when the Mac goes away.
 
 You need [Heimdall](https://git.sr.ht/~grimler/Heimdall) (the maintained fork builds natively on Apple Silicon) and, for the backup, TWRP for `lt02`.
 
-1. **Back up first.** Flash TWRP to `RECOVERY`, boot it, and run `scripts/backup-partitions.sh <out-dir>`.
-2. Download mode: Power + Home + Volume Down, then Volume Up.
-3. `heimdall flash --RECOVERY build/macdeck-os-v1.2.img --no-reboot`
-4. Boot it: Power + Home + Volume Down until the screen goes black, then immediately Power + Home + Volume Up.
+1. **Back up first.** Flash TWRP to `RECOVERY`, boot it, and run `scripts/backup-partitions.sh <out-dir>`. Keep `KERNEL.img`: it is both the build input and your way back to stock Android.
+2. Download mode: Power + Home + Volume Down, then Volume Up. Once MacDeck OS is running: `adb shell setprop debug.macdeck.reboot download`.
+3. Test from the recovery slot first: `heimdall flash --RECOVERY build/macdeck-os-v1.4.img --no-reboot`, then boot it with Power + Home + Volume Down until the screen goes black, then immediately Power + Home + Volume Up.
+4. Make it the main system: `heimdall flash --KERNEL build/macdeck-os-v1.4.img --RECOVERY twrp.img`. Stock Android will no longer boot; `heimdall flash --KERNEL KERNEL.img` restores it.
 
 Hard-won notes:
 - Samsung's stock `init` **reboots into recovery** if it can't load `/sepolicy`, or if a `critical` service keeps crashing. With MacDeck OS in `RECOVERY` that means a boot loop, so the stock policy files are kept and no service is marked critical.
 - The bootloader ignores the image's own kernel cmdline, so `androidboot.selinux=permissive` does nothing. `init.rc` runs `setenforce 0` instead.
 - Samsung's `adbd` stays `uid=shell` even with `ro.secure=0`, so `adb reboot download` fails. MacDeck OS exposes dev switches the shell user may set:
-  - `setprop debug.macdeck.reboot download|recovery`
+  - `setprop debug.macdeck.reboot download|recovery|normal|off`
   - `setprop debug.macdeck.deck stop|start`, then test builds from `/data/local/tmp` without reflashing
 - Loopback is down unless something runs `ifup lo`. Without it, every adb-forwarded connection closes immediately.
 - The stock kernel reports touch in portrait axes (x 0–598, y 0–1022) while the framebuffer is landscape. The deck detects this and rotates.
-- **A normal power-on boots stock Android, which rewrites `RECOVERY` with stock recovery** (`install-recovery.sh`) and erases MacDeck OS.
+- While MacDeck OS lives only in `RECOVERY`, a normal power-on boots stock Android, which rewrites `RECOVERY` with stock recovery (`install-recovery.sh`). Moving MacDeck OS to `KERNEL` ends this.
+- Powered off and then plugged in, the bootloader starts `KERNEL` in low-power charging mode (`androidboot.mode=charger`). Samsung's init then runs only `on charger`, and the kernel **does not register the touchscreen** (event0 becomes the power key). MacDeck OS reboots out of charger mode into a normal boot, and the deck finds the touchscreen by name.
 - A weak USB cable or a bus-powered hub can make the USB link drop when VBUS sags (`mv-udc: vbus is 0`). The backup script survives this with small verified chunks.
 
 The bootloader partitions are never written, so download mode always remains available as a way back.
@@ -105,7 +106,7 @@ The bootloader partitions are never written, so download mode always remains ava
 - [x] MacDeck OS v0: boots to our own deck program, drawing + touch, no Android
 - [x] Mac link: live metrics on the deck, buttons trigger Mac actions (protocol v1)
 - [x] Text rendering (Spleen bitmap font) and a first deck layout
-- [ ] Move MacDeck OS to the main boot partition (stock Android currently erases it on a normal boot)
+- [x] MacDeck OS as the main system (`KERNEL`), TWRP kept in `RECOVERY`; plugging in a powered-off tablet starts the deck
 - [ ] Pages, custom layouts, battery/brightness controls on the deck
 - [ ] AI-agent status (Claude Code, Codex, …)
 - [ ] Wi-Fi transport (tablet on a wall charger)
