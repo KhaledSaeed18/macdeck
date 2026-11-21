@@ -10,7 +10,10 @@ export type Action =
   | { type: "open-app"; app: string }
   | { type: "command"; argv: string[] };
 
-export interface ButtonDef { id: string; label: string; color: string; action: Action }
+// Up to 12 buttons: all appear on the Shortcuts page; those with `home: true` (or, if none
+// are flagged, the first four) are also pinned to the Home page.
+export const MAX_BUTTONS = 12;
+export interface ButtonDef { id: string; label: string; color: string; home?: boolean; action: Action }
 
 export function loadButtons(dir: string): ButtonDef[] {
   const local = new URL("../config.json", dir), example = new URL("../config.example.json", dir);
@@ -22,7 +25,8 @@ export function loadButtons(dir: string): ButtonDef[] {
     if (!/^[0-9a-f]{6}$/i.test(b.color)) throw new Error(`bad color for ${b.id}`);
   }
   console.log(`buttons from ${file.pathname.split("/").slice(-2).join("/")}: ${cfg.buttons.map((b) => b.id).join(", ")}`);
-  return cfg.buttons.slice(0, 6);
+  if (cfg.buttons.length > MAX_BUTTONS) console.warn(`only the first ${MAX_BUTTONS} buttons are used`);
+  return cfg.buttons.slice(0, MAX_BUTTONS);
 }
 
 export async function runAction(b: ButtonDef): Promise<string> {
