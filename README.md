@@ -222,6 +222,23 @@ The host reconnects automatically. The deck greys out when the Mac goes away.
 
 You need [Heimdall](https://git.sr.ht/~grimler/Heimdall) (the maintained fork builds natively on Apple Silicon) and, for the backup, TWRP for `lt02`.
 
+What ends up where on the tablet's eMMC:
+
+```mermaid
+flowchart LR
+    subgraph EMMC["SM-T210 eMMC"]
+        direction TB
+        SBL["SBL / SBL2<br/>bootloader + download mode"]:::keep
+        KERNEL["KERNEL<br/>MacDeck OS (stock kernel + our ramdisk)"]:::ours
+        RECOVERY["RECOVERY<br/>TWRP (rescue)"]:::tool
+        SYSTEM["SYSTEM<br/>stock Android, mounted read-only<br/>only for the dev shell"]:::keep
+        DATA["EFS · USER · CACHE · ..."]:::keep
+    end
+    classDef keep fill:#17222b,stroke:#97aab7,color:#e6edf2
+    classDef ours fill:#63dab4,stroke:#0b241d,color:#0b241d
+    classDef tool fill:#2f4a5e,stroke:#97aab7,color:#e6edf2
+```
+
 1. **Back up first.** Flash TWRP to `RECOVERY`, boot it, and run `scripts/backup-partitions.sh <out-dir>`. Keep `KERNEL.img`: it is both the build input and your way back to stock Android.
 2. Download mode: Power + Home + Volume Down, then Volume Up. Once MacDeck OS is running: `adb shell setprop debug.macdeck.reboot download`.
 3. Test from the recovery slot first: `heimdall flash --RECOVERY build/macdeck-os-v3.0.img --no-reboot`, then boot it with Power + Home + Volume Down until the screen goes black, then immediately Power + Home + Volume Up.
