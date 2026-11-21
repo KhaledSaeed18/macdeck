@@ -72,6 +72,7 @@ static Rect sheet(void) {
 static Rect pick_tile(int i) { Rect s = sheet(); return grid_cell((Rect){s.x + 16, s.y + 48, s.w - 32, s.h - 64}, PICK_COLS, PICK_ROWS, 16, i); }
 
 int chrome_hit(int x, int y) {
+    if (prompt_visible()) return prompt_hit(x, y);  // an agent prompt is modal
     if (in_rect(squares_zone(), x, y)) return CTRL_SQUARES;
     if (!picker_open) return -1;
     for (int i = 0; i < NPAGES; i++)
@@ -80,6 +81,7 @@ int chrome_hit(int x, int y) {
 }
 
 void chrome_press(int c) {
+    if (c >= PROMPT_CTRL) { prompt_press(c); return; }
     if (c == CTRL_SQUARES) picker_open = !picker_open;
     else if (c == CTRL_PICK_CLOSE) picker_open = 0;
     else if (c >= CTRL_PICK && c < CTRL_PICK + NPAGES) page_show(registry[c - CTRL_PICK]);
@@ -181,6 +183,7 @@ void pages_render(void) {
     }
     gfx_noclip();
     if (picker_open) draw_picker();
+    if (prompt_visible()) prompt_render();
     bottom_bar();
     present();
     dirty = 0;

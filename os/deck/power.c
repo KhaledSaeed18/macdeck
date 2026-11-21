@@ -123,6 +123,7 @@ void power_init(void) {
 void power_tick(double t) {
     if (t - last_sample >= (screen == SCREEN_OFF ? 30 : 2)) { tablet_sample(); last_sample = t; }
     if (connected != was_connected) { was_connected = connected; if (!connected) disconnected_since = t; }
+    if (prompt_visible()) last_activity = t;    // an agent is waiting: keep the screen on
     double idle = t - last_activity;
     if (screen == SCREEN_ON && dim_after && idle > dim_after) set_screen(SCREEN_DIM, "idle");
     if (screen != SCREEN_OFF && off_after && idle > off_after) set_screen(SCREEN_OFF, "idle");

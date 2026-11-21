@@ -60,6 +60,7 @@ void link_accept(int srv) {
     client = c;
     setsockopt(c, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
     connected = 1; last_rx = now(); rxlen = 0; dirty = 1;
+    prompt_clear();  // a new host session starts with no prompts
     logmsg("client connected");
     toast("Mac connected", 4);
     link_send("HELLO|macdeck/1|%s|%dx%d", BUILD, W, H);

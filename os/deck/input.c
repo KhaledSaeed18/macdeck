@@ -92,7 +92,7 @@ static void finger_down(int sx, int sy) {
 
 static void finger_move(int sx, int sy) {
     int dx = sx - down_x, dy = sy - down_y;
-    if (!swiping && !picker_open && abs(dx) > SWIPE_START && abs(dx) > abs(dy)) { swiping = 1; pressed = -1; dirty = 1; }
+    if (!swiping && !picker_open && !prompt_visible() && abs(dx) > SWIPE_START && abs(dx) > abs(dy)) { swiping = 1; pressed = -1; dirty = 1; }
     if (swiping) {
         drag = (float)dx; dirty = 1;  // pages wrap around, so there is no end to resist at
         return;

@@ -139,3 +139,14 @@ enum { CHROME_CTRL = 1000, CTRL_SQUARES = CHROME_CTRL, CTRL_PICK_CLOSE, CTRL_PIC
 extern int picker_open;
 int  chrome_hit(int x, int y);             // chrome control under the point, or -1
 void chrome_press(int c);
+
+// ---------------------------------------------------------------- prompts (prompt.c)
+// A coding agent asks for permission, a choice or a plan approval (ASK... messages). The card is
+// modal and drawn over every page; its controls start at PROMPT_CTRL.
+#define PROMPT_CTRL 2000
+int  prompt_handle(char **f, int n);       // ASK, ASKTEXT, ASKOPT, ASKSHOW, ASKDONE; 1 = redraw
+int  prompt_visible(void);
+void prompt_render(void);
+int  prompt_hit(int x, int y);             // >= PROMPT_CTRL while a card is shown, else -1
+void prompt_press(int c);
+void prompt_clear(void);                   // forget all prompts (new connection)

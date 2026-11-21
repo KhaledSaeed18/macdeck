@@ -163,6 +163,7 @@ void model_handle(char *line) {
     else if (!strcmp(type, "ICON") && n >= 4) changed = handle_icon(f);
     else if (!strcmp(type, "AGENT") && n >= 3) changed = handle_agent(f, n);
     else if (!strcmp(type, "MAC") && n >= 3) changed = handle_mac(f, n);
+    else if (!strncmp(type, "ASK", 3)) changed = prompt_handle(f, n);
     else if (!strcmp(type, "AGENTS") && n >= 5) {
         AgentCounts c = {atoi(f[1]), atoi(f[2]), atoi(f[3]), atoi(f[4])};
         changed = memcmp(&c, &agent_counts, sizeof c) != 0;
