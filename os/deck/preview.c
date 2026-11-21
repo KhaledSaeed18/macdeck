@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "deck.h"
 
@@ -26,6 +27,39 @@ static void feed(const char *fmt, ...) {
     char line[512];
     va_list ap; va_start(ap, fmt); vsnprintf(line, sizeof line, fmt, ap); va_end(ap);
     model_handle(line);
+}
+
+// MACDECK_PROMPT=permission|question|multi|plan draws an agent prompt card over the page
+static void sample_prompt(const char *kind) {
+    if (!kind) return;
+    if (!strcmp(kind, "permission")) {
+        feed("ASK|p1|permission|Claude|my-app|Run a command|1|1|0");
+        feed("ASKTEXT|p1|$ npm test -- --watch=false --reporter=dot && npm run lint -- --max-warnings=0");
+        feed("ASKTEXT|p1|Run the unit tests once, then lint the project");
+        feed("ASKOPT|p1|check|Allow||accent");
+        feed("ASKOPT|p1|always|Always|allow npm test in my-app from now on|blue");
+        feed("ASKOPT|p1|cross|Deny||bad");
+        feed("ASK|p2|permission|Codex|backend|Edit a file|1|1|0");  // a second one waiting
+        feed("ASKSHOW|p2");
+    } else if (!strcmp(kind, "question") || !strcmp(kind, "multi")) {
+        int multi = !strcmp(kind, "multi");
+        feed("ASK|p1|question|Claude|my-app|%s|1|2|%d", multi ? "Which checks should run before each commit?" : "Which database should the new service use?", multi);
+        feed("ASKOPT|p1|-|%s|%s|-", multi ? "Lint" : "Postgres", multi ? "ESLint with the project rules" : "Relational, the same as the main app; needs a running server");
+        feed("ASKOPT|p1|-|%s|%s|-", multi ? "Type check" : "SQLite", multi ? "tsc --noEmit, about 20 s" : "A single file next to the service, nothing to run");
+        feed("ASKOPT|p1|-|%s|%s|-", multi ? "Unit tests" : "Redis", multi ? "Only the tests for changed files" : "In memory, for caching only");
+        if (multi) feed("ASKOPT|p1|-|Format|Prettier --check|-");
+    } else if (!strcmp(kind, "plan")) {
+        feed("ASK|p1|plan|Claude|my-app|Approve the plan?|1|1|0");
+        feed("ASKTEXT|p1|Plan: add a settings page");
+        feed("ASKTEXT|p1|1. Add a /settings route and page component");
+        feed("ASKTEXT|p1|2. Store preferences in the existing user table");
+        feed("ASKTEXT|p1|3. Add tests for the API and the page");
+        feed("ASKOPT|p1|auto|Auto-accept|approve, and accept file edits without asking|accent");
+        feed("ASKOPT|p1|check|Approve|approve, and ask before each edit|blue");
+        feed("ASKOPT|p1|back|Keep planning||-");
+    }
+    feed("ASKSHOW|p1");
+    if (!strcmp(kind, "multi")) { prompt_press(PROMPT_CTRL + 0); prompt_press(PROMPT_CTRL + 2); }  // two ticked
 }
 
 int main(int argc, char **argv) {
@@ -74,6 +108,7 @@ int main(int argc, char **argv) {
     feed("MAC|airdrop|contacts");
     feed("MAC|dark|on");
     toast("Opened Calculator", 4);
+    sample_prompt(getenv("MACDECK_PROMPT"));
     pages_render();
     printf("wrote %s (%s)\n", out_path, page_at(page)->title);
     return 0;
