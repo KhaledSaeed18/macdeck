@@ -24,7 +24,8 @@ int button_state(int i, int enabled) {
 // ---------------------------------------------------------------- Mac buttons (Home + Shortcuts)
 void draw_mac_button(Rect r, int slot, int ctrl) {
     if (slot < 0 || !buttons[slot].id[0]) { ui_button(r, NULL, 0, BTN_NORMAL); return; }
-    ui_button(r, buttons[slot].label, buttons[slot].color, button_state(ctrl, connected));
+    const Button *b = &buttons[slot];
+    ui_button_icon(r, b->label, b->has_icon ? b->icon : NULL, b->color, button_state(ctrl, connected));
 }
 
 void mac_button_press(int slot) {

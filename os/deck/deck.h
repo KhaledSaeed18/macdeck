@@ -11,6 +11,7 @@
 //   main.c       framebuffer, startup and event loop
 #pragma once
 #include <stddef.h>
+#include <stdint.h>
 
 #include "gfx.h"
 
@@ -33,7 +34,7 @@ void copy(char *dst, size_t cap, const char *src);
 
 // ---------------------------------------------------------------- model (model.c)
 typedef struct { char label[32], value[24], detail[40]; int level, set; } Tile;
-typedef struct { char id[32], label[32]; unsigned color; int home; } Button;
+typedef struct { char id[32], label[32]; unsigned color; int home, has_icon; uint16_t icon[16]; } Button;
 typedef struct { char key[16]; float v[HISTORY]; int n, head; } Series;
 enum { AGENT_IDLE, AGENT_WORKING, AGENT_WAITING };
 typedef struct { char agent[16], title[48], where[40], since[12], detail[48], id[12]; int state, set; } Agent;

@@ -93,6 +93,19 @@ static int handle_button(char **f, int n) {
     copy(b->id, sizeof b->id, f[2]); copy(b->label, sizeof b->label, f[3]);
     b->color = (unsigned)strtoul(f[4], NULL, 16);
     b->home = n >= 6 && !strcmp(f[5], "home");
+    b->has_icon = 0;  // an ICON for this slot follows if it has one
+    return 1;
+}
+
+static int handle_icon(char **f) {  // ICON|button|<slot>|<64 hex digits: 16 rows x 16 bits>
+    int s = atoi(f[2]);
+    if (strcmp(f[1], "button") || s < 0 || s >= MAX_BUTTONS || strlen(f[3]) != 64) return 0;
+    Button *b = &buttons[s];
+    for (int r = 0; r < 16; r++) {
+        char row[5] = {f[3][r * 4], f[3][r * 4 + 1], f[3][r * 4 + 2], f[3][r * 4 + 3], 0};
+        b->icon[r] = (uint16_t)strtoul(row, NULL, 16);
+    }
+    b->has_icon = 1;
     return 1;
 }
 
@@ -147,6 +160,7 @@ void model_handle(char *line) {
     else if (!strcmp(type, "CLOCK") && n >= 3) changed = SET(clock_time, f[1]) | SET(clock_date, f[2]);
     else if (!strcmp(type, "TILE") && n >= 6) changed = handle_tile(f);
     else if (!strcmp(type, "BUTTON") && n >= 5) changed = handle_button(f, n);
+    else if (!strcmp(type, "ICON") && n >= 4) changed = handle_icon(f);
     else if (!strcmp(type, "AGENT") && n >= 3) changed = handle_agent(f, n);
     else if (!strcmp(type, "MAC") && n >= 3) changed = handle_mac(f, n);
     else if (!strcmp(type, "AGENTS") && n >= 5) {
