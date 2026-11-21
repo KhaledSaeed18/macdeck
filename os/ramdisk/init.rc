@@ -1,16 +1,25 @@
-# MacDeck OS v0 — minimal init.rc for Samsung's stock Android 4.4 init (SM-T210).
-# No Android framework: only ueventd (device nodes), adbd (dev access) and our deck0.
-# Notes:
-#  - Stock init REBOOTS INTO RECOVERY if /sepolicy fails to load, so the stock policy files
-#    are kept in the ramdisk and the kernel cmdline sets androidboot.selinux=permissive.
-#  - Stock init also reboots into recovery if a "critical" service crashes repeatedly,
-#    so nothing here is marked critical.
-#  - /system is mounted read-only only so adbd's shell (/system/bin/sh) and toolbox work
-#    during development. Nothing from /system is started.
+# MacDeck OS — init.rc for Samsung's stock Android 4.4 init (SM-T210).
+# No Android framework: only ueventd (device nodes), adbd (dev access) and our deck.
+#
+# Notes learned on this device:
+#  - Stock init REBOOTS INTO RECOVERY if /sepolicy fails to load, and if a "critical"
+#    service keeps crashing. MacDeck OS lives in RECOVERY, so either would be a boot loop:
+#    the stock policy files stay in the ramdisk and nothing here is marked critical.
+#  - The bootloader ignores the image's own cmdline (androidboot.selinux=permissive has no
+#    effect), so SELinux is switched to permissive here with `setenforce 0`.
+#  - Samsung's adbd always runs as uid shell. Dev controls are therefore exposed through
+#    debug.* properties, which the shell user may set:
+#      adb shell setprop debug.macdeck.deck stop|start   stop/start the built-in deck
+#      adb shell setprop debug.macdeck.reboot download   reboot into download mode
+#      adb shell setprop debug.macdeck.reboot recovery   reboot into MacDeck OS again
+#    and /data/local/tmp is writable by shell for test binaries.
+#  - /system is mounted read-only only so adbd's shell (/system/bin/sh) and toolbox work.
+#    Nothing from /system is started.
 
 on early-init
     write /proc/1/oom_adj -16
     setcon u:r:init:s0
+    setenforce 0
     start ueventd
 
 on init
@@ -21,23 +30,42 @@ on init
     mount tmpfs tmpfs /tmp mode=0775
     mkdir /data 0771 root root
     mount tmpfs tmpfs /data mode=0771
-    mkdir /data/local 0771 root root
-    mkdir /data/local/tmp 0771 root root
+    mkdir /data/local 0771 shell shell
+    mkdir /data/local/tmp 0771 shell shell
 
 on fs
     mount ext4 /dev/block/platform/sdhci-pxav3.2/by-name/SYSTEM /system ro wait
 
 on boot
+    # loopback is DOWN until someone brings it up; the deck's TCP listener needs it
+    ifup lo
+    hostname macdeck
     write /sys/class/android_usb/android0/enable 0
     write /sys/class/android_usb/android0/idVendor 04e8
     write /sys/class/android_usb/android0/idProduct 6860
-    write /sys/class/android_usb/android0/iManufacturer MacDeck
-    write /sys/class/android_usb/android0/iProduct MacDeckOS-v0
     write /sys/class/android_usb/android0/iSerial $ro.serialno
     write /sys/class/android_usb/android0/functions adb
     write /sys/class/android_usb/android0/enable 1
+    # let the shell user (dev runs of the deck from /data/local/tmp) use the screen,
+    # touch and backlight. Samsung's ueventd makes fb0 system:media 0660 otherwise.
+    chown root graphics /dev/graphics/fb0
+    chmod 0660 /dev/graphics/fb0
+    chown shell graphics /sys/class/backlight/panel/brightness
+    chmod 0664 /sys/class/backlight/panel/brightness
     start adbd
-    start deck0
+    start deck
+
+on property:debug.macdeck.deck=stop
+    stop deck
+
+on property:debug.macdeck.deck=start
+    start deck
+
+on property:debug.macdeck.reboot=download
+    powerctl reboot,download
+
+on property:debug.macdeck.reboot=recovery
+    powerctl reboot,recovery
 
 service ueventd /sbin/ueventd
     seclabel u:r:ueventd:s0
@@ -47,6 +75,6 @@ service adbd /sbin/adbd
     disabled
     seclabel u:r:adbd:s0
 
-service deck0 /sbin/deck0
+service deck /sbin/deck
     disabled
     seclabel u:r:init_shell:s0
