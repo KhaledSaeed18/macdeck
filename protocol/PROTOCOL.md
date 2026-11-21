@@ -21,6 +21,7 @@ The link between the Mac host and the deck running on the tablet.
 | `HELLO\|macdeck/1\|<build>\|<width>x<height>` | Sent immediately after the connection is accepted |
 | `PONG\|<token>` | Reply to `PING` |
 | `PRESS\|<button-id>` | A button was tapped (touch released inside the same button it started on) |
+| `ANSWER\|<prompt-id>\|<choice>` | Answer to an agent prompt: an option index (`2`), indexes for a multi-choice question (`0,2`), or `mac` to answer it on the Mac instead. |
 | `MACSET\|<key>\|<value>` | Change a Mac setting from the Mac page: `volume\|0-100` (also unmutes), `mute\|on\|off`, `wifi\|on\|off`, `airdrop\|off\|contacts\|everyone`, `dark\|on\|off`, `lock\|now`. The host maps each key to one fixed command; anything else is rejected. |
 | `FOCUS\|<agent-id>` | An agent session card was tapped: bring the app or terminal showing that session to the front on the Mac. `agent-id` comes from `AGENT`. |
 | `SETTING\|<key>\|<value>` | The user changed a tablet setting on the deck. The host should store it and send it back on the next connection. |
@@ -41,6 +42,11 @@ The link between the Mac host and the deck running on the tablet.
 | `MAC\|battery\|<pct>\|<charging 0\|1>\|<source>\|<line>\|<detail>` | Mac battery for the Mac page: `source` e.g. `Power adapter`, `line` e.g. `Charging, 0:42 to full`, `detail` e.g. `Health 96%  197 cycles`. |
 | `MAC\|sound\|<volume 0-100>\|<muted 0\|1>` | Output volume and mute. |
 | `MAC\|wifi\|on\|off\|<detail>` · `MAC\|airdrop\|off\|contacts\|everyone` · `MAC\|dark\|on\|off` | The Mac page's switches. All `MAC` messages are sent every 2 s while the screen is on, and right after each `MACSET`. |
+| `ASK\|<id>\|<kind>\|<agent>\|<where>\|<title>\|<step>\|<steps>\|<multi 0\|1>` | Start an agent prompt card, or replace it with the next question. `kind` is `permission`, `question` or `plan`; `step`/`steps` count the questions of one prompt. Followed by `ASKTEXT` and `ASKOPT` lines and then `ASKSHOW`. |
+| `ASKTEXT\|<id>\|<text>` | A paragraph of the card's body (command, file, plan line); the deck wraps it. Up to 6. |
+| `ASKOPT\|<id>\|<icon>\|<label>\|<detail>\|<style>` | An option: a button (permission, plan) or a tile (question). `icon` is a deck icon name (`check`, `always`, `cross`, `auto`, `back`) or `-`; `style` is `accent`, `blue`, `bad` or `-`. `detail` explains it (shown under the body, or on the tile). Up to 6. |
+| `ASKSHOW\|<id>` | The card is complete: show it (over any page) and wake the screen. The deck adds an "On Mac" choice to every card. |
+| `ASKDONE\|<id>` | Remove the card (answered, answered on the Mac, or the agent stopped waiting). |
 | `STATUS\|<text>[\|<seconds>]` | Short-lived message (toast) in the bottom bar, e.g. the result of an action. Shown for `seconds` (default 4, max 60), then the line clears. Use ~8 s for errors. |
 | `SETTING\|<key>\|<value>` | Restore a tablet setting (the tablet has no persistent storage) |
 | `WAKE` | Turn the screen on, e.g. for a notification |
