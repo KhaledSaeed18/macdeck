@@ -41,6 +41,19 @@ void fill(int x, int y, int w, int h, uint32_t hex) {
     }
 }
 void fill_r(Rect r, uint32_t hex) { fill(r.x, r.y, r.w, r.h, hex); }
+void shade_r(Rect r, int pct) {  // scale every colour channel to pct % (alpha bits kept)
+    int x0 = r.x < clip_x0 ? clip_x0 : r.x, x1 = r.x + r.w > clip_x1 ? clip_x1 : r.x + r.w;
+    int y0 = r.y < 0 ? 0 : r.y, y1 = r.y + r.h > H ? H : r.y + r.h;
+    uint32_t amask = alen ? ((1u << alen) - 1) << aoff : 0;
+    for (int j = y0; j < y1; j++) {
+        uint32_t *row = back + (size_t)j * W;
+        for (int i = x0; i < x1; i++) {
+            uint32_t p = row[i];
+            row[i] = (p & amask) | ((p >> roff & 255) * pct / 100) << roff |
+                     ((p >> goff & 255) * pct / 100) << goff | ((p >> boff & 255) * pct / 100) << boff;
+        }
+    }
+}
 void frame_r(Rect r, int t, uint32_t hex) {
     fill(r.x, r.y, r.w, t, hex); fill(r.x, r.y + r.h - t, r.w, t, hex);
     fill(r.x, r.y, t, r.h, hex); fill(r.x + r.w - t, r.y, t, r.h, hex);

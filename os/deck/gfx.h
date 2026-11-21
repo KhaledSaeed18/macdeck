@@ -32,6 +32,7 @@ void gfx_noclip(void);
 uint32_t mix(uint32_t a, uint32_t b, int pct);  // blend b over a, pct 0..100 (hex colours)
 void fill(int x, int y, int w, int h, uint32_t hex);
 void fill_r(Rect r, uint32_t hex);
+void shade_r(Rect r, int pct);      // darken what is already drawn (scrim behind a sheet)
 void frame_r(Rect r, int t, uint32_t hex);
 void line(int x0, int y0, int x1, int y1, int t, uint32_t hex);
 int  text_w(const Font *f, const char *s);
