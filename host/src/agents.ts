@@ -62,12 +62,29 @@ function readTail(file: string, bytes: number): string {
     return buf.toString("utf8");
   } finally { closeSync(fd); }
 }
-function firstLine(file: string): string {
+function readHead(file: string, bytes: number): string {
   const fd = openSync(file, "r");
   try {
-    const buf = Buffer.alloc(64 * 1024), n = readSync(fd, buf, 0, buf.length, 0), s = buf.toString("utf8", 0, n);
-    return s.slice(0, s.indexOf("\n") >= 0 ? s.indexOf("\n") : n);
+    const buf = Buffer.alloc(bytes), n = readSync(fd, buf, 0, buf.length, 0);
+    return buf.toString("utf8", 0, n);
   } finally { closeSync(fd); }
+}
+
+// A Codex thread's meta line, and its first real prompt (skipping the injected <...> context
+// blocks): the title for threads without a name, such as `codex exec` runs.
+interface CodexMeta { id: string; cwd: string; prompt?: string }
+function codexMeta(file: string): CodexMeta | undefined {
+  const lines = readHead(file, 512 * 1024).split("\n");
+  let meta: CodexMeta;
+  try { const p = JSON.parse(lines[0]).payload; meta = { id: String(p.id), cwd: String(p.cwd ?? "") }; } catch { return undefined; }
+  for (const l of lines) {
+    if (!l.includes('"role":"user"')) continue;
+    try {
+      const text = JSON.parse(l).payload?.content?.find((c: { text?: string }) => c.text && !c.text.startsWith("<"))?.text;
+      if (text) { meta.prompt = text.replace(/\s+/g, " ").trim(); break; }
+    } catch { /* cut-off last line */ }
+  }
+  return meta;
 }
 
 let titles = new Map<string, string>(), titlesMtime = 0;
@@ -86,7 +103,7 @@ function codexTitle(id: string): string | undefined {
   return titles.get(id);
 }
 
-const metaCache = new Map<string, { id: string; cwd: string }>();
+const metaCache = new Map<string, CodexMeta>();
 function codexSessions(): Agent[] {
   const out: Agent[] = [], now = Date.now();
   for (const back of [0, 1]) {                // today's and yesterday's folders
@@ -101,8 +118,9 @@ function codexSessions(): Agent[] {
       try { mtime = statSync(file).mtimeMs; } catch { continue; }
       if (now - mtime > Math.max(CODEX_IDLE_SHOWN_MS, CODEX_STALE_MS)) continue;
       let meta = metaCache.get(file);
-      if (!meta) {
-        try { const p = JSON.parse(firstLine(file)).payload; meta = { id: String(p.id), cwd: String(p.cwd ?? "") }; } catch { continue; }
+      if (!meta?.prompt) {                    // re-read until the prompt has been written
+        meta = codexMeta(file);
+        if (!meta) continue;
         metaCache.set(file, meta);
       }
       let last: { type: string; at: number } | undefined;
@@ -117,7 +135,7 @@ function codexSessions(): Agent[] {
       if (!running && now - mtime > CODEX_IDLE_SHOWN_MS) continue;
       const where = folder(meta.cwd);
       out.push({ key: `codex:${meta.id}`, agent: "Codex", state: running ? "working" : "idle",
-        title: codexTitle(meta.id) || where || "Codex", where, since: last?.at ?? mtime });
+        title: codexTitle(meta.id) || meta.prompt || where || "Codex", where, since: last?.at ?? mtime });
     }
   }
   return out;
