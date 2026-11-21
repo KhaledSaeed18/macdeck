@@ -15,7 +15,7 @@ Swipe left/right; the pages loop around (past the last page comes Home, and back
 | **Home** | a summary: agent sessions (counts and the top four; tap the panel for the Agents page), CPU, memory and network, and three pinned shortcuts |
 | **Agents** | up to six coding-agent sessions (Claude Code, Codex, opencode, Copilot CLI, Qwen Code): needs you, working or idle, and for how long; tap a card to open that session on the Mac |
 | **Stats** | live charts (about 2 minutes) of CPU, memory and network down/up, plus a disk meter |
-| **Shortcuts** | up to 12 buttons that run allowlisted actions on the Mac |
+| **Shortcuts** | up to 12 buttons with pixel-art icons that run allowlisted actions on the Mac |
 | **Mac** | a control centre for the Mac: battery (health, cycles, adapter), volume bar with mute, Wi-Fi, AirDrop, Dark Mode, Lock Screen |
 | **Tablet** | battery, power draw, brightness and system readings; brightness, dim/off timeouts, CPU mode, screen off |
 
@@ -171,6 +171,12 @@ The host reads what the agents already write to disk. Nothing is installed into 
 - **Other agents need their own reader.** Each tool stores its state differently, so an agent that isn't in this table won't appear. A reader is a function in `host/src/agents.ts` that returns the tool's sessions. Gemini CLI isn't supported yet: on the development Mac it never completed a turn, so there was no real log to build a reader from.
 - When a session starts waiting for you, or finishes a turn, the host wakes the screen and shows a toast for 15 s (even if the screen was off). A new state has to hold for two polls in a row, to ignore flicker.
 - Both sources are internal formats of those tools and may change between versions. The reader skips what it cannot parse.
+
+## Button icons
+
+Each button in `host/config.json` can name an icon: `"icon": "ghost"` uses `host/icons/ghost.txt`, 16 lines of 16 `#` (ink) or `.` (empty). The host sends it to the deck, which draws it at 3x above the label on Home and Shortcuts. Adding an icon is a new text file and a host restart, no reflash.
+
+Included (original pixel art, not app logos): `spark`, `code`, `ghost`, `letter-z`, `letter-n`, `globe`, `notes`, `calculator`, `folder`, `gear`, `chart`, `moon`, `terminal`.
 
 ## Mac page
 
