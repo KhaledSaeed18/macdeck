@@ -15,6 +15,7 @@
 #      adb shell setprop debug.macdeck.reboot normal     plain reboot (MacDeck OS)
 #      adb shell setprop debug.macdeck.reboot off        power off
 #    and /data/local/tmp is writable by shell for test binaries.
+#  - Lives in KERNEL (main boot) since v1.3; TWRP stays in RECOVERY as the rescue tool.
 #  - /system is mounted read-only only so adbd's shell (/system/bin/sh) and toolbox work.
 #    Nothing from /system is started.
 
@@ -35,10 +36,19 @@ on init
     mkdir /data/local 0771 shell shell
     mkdir /data/local/tmp 0771 shell shell
 
-on fs
-    mount ext4 /dev/block/platform/sdhci-pxav3.2/by-name/SYSTEM /system ro wait
-
+# Charger boot (powered off + cable plugged in): the bootloader sets
+# androidboot.mode=charger and init runs only "on charger". Samsung's kernel does not
+# register the touchscreen in that low-power mode, so reboot straight into a normal boot
+# (verified: a reboot from charger mode comes back as a normal boot). The net effect:
+# plugging in a powered-off tablet turns the deck on.
 on boot
+    setprop macdeck.start 1
+
+on charger
+    powerctl reboot
+
+on property:macdeck.start=1
+    mount ext4 /dev/block/platform/sdhci-pxav3.2/by-name/SYSTEM /system ro wait
     # loopback is DOWN until someone brings it up; the deck's TCP listener needs it
     ifup lo
     hostname macdeck
