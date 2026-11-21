@@ -4,7 +4,7 @@ Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool but
 
 Instead of running an app on top of Android, MacDeck replaces Android's entire userspace with **MacDeck OS**: the tablet's own stock Linux kernel plus a tiny ramdisk that starts a single deck program. No Android framework, no Java, no launcher. It boots straight into the deck.
 
-> **Status: early work in progress.** MacDeck OS v0 boots, draws and handles touch on the target tablet. The Mac connection is the next step.
+> **Status: early work in progress.** MacDeck OS v1.2 boots straight into the deck. The deck shows live Mac metrics, and its buttons run actions on the Mac over USB.
 
 ## Target hardware
 
@@ -25,11 +25,16 @@ Other devices would need their own kernel, partition layout and quirks. The appr
                  └─ MacDeck ramdisk
                       ├─ init      (Samsung's stock Android init, used only as a tiny process supervisor)
                       ├─ ueventd   (creates /dev nodes)
-                      ├─ adbd      (development access)
-                      └─ deck0     (our program: draws to /dev/graphics/fb0, reads /dev/input/event0)
+                      ├─ adbd      (development access + the USB link)
+                      └─ deck      (our program: draws to /dev/graphics/fb0, reads /dev/input/event0,
+                                    listens on 127.0.0.1:8765 for the Mac)
+
+ Mac: host/ (Node + TypeScript, no dependencies)
+      adb forward tcp:18765 → tablet:8765, then speaks protocol/PROTOCOL.md:
+      sends clock + 4 metric tiles + 6 button definitions, runs allowlisted actions on PRESS
 ```
 
-v0 measurements: the kernel reaches `init` at ~4.5 s, `deck0` is running at ~5.1 s, only 4 userspace processes run, and ~834 MB of RAM is free (stock Android idled at ~55 MB free).
+Measured: the kernel reaches `init` at ~4.5 s and the deck is running at ~5.1 s, only 4 userspace processes run, and ~834 MB of RAM is free (stock Android idled at ~55 MB free).
 
 **No Samsung or third-party binaries are stored in this repository.** `scripts/build-os-image.py` extracts the kernel and the few stock ramdisk files it reuses from a dump of *your own* device's boot partition at build time.
 
@@ -37,10 +42,14 @@ v0 measurements: the kernel reaches `init` at ~4.5 s, `deck0` is running at ~5.1
 
 | Path | What |
 |---|---|
-| `os/deck0/` | The deck program (C, statically linked, no dependencies beyond libc) |
+| `os/deck/` | The deck program (C, statically linked, libc only), the Spleen font header and a Mac-side preview renderer |
 | `os/ramdisk/` | `init.rc` and `default.prop` for MacDeck OS |
+| `host/` | Mac host: metrics, button layout, actions (`config.example.json`; your own `config.json` is git-ignored) |
+| `protocol/PROTOCOL.md` | The Mac ↔ deck message format (v1) |
+| `third_party/spleen/` | Spleen font license (the font is compiled into the deck) |
 | `scripts/build-os-image.py` | Builds the boot image: stock kernel + our ramdisk, stock load addresses |
 | `scripts/backup-partitions.sh` | Dumps every eMMC partition over ADB from TWRP, in verified, resumable chunks |
+| `scripts/bdf2c.py` | Converts BDF bitmap fonts to a C header |
 | `spikes/` | Small experiments (e.g. `fbtouch`, the first framebuffer + touch test) |
 | `Makefile` | Builds everything |
 
@@ -49,11 +58,24 @@ v0 measurements: the kernel reaches `init` at ~4.5 s, `deck0` is running at ~5.1
 Requirements: Android NDK (r28 tested; found via `ANDROID_NDK_HOME` or `~/Library/Android/sdk/ndk/*`) and Python 3.
 
 ```bash
-make                     # build/deck0
-MACDECK_STOCK_BOOT=/path/to/KERNEL.img make image   # build/macdeck-os-v0.img
+make                     # build/deck (tablet) + build/deck-preview (Mac)
+make preview             # render the deck UI with sample data → build/preview.png
+MACDECK_STOCK_BOOT=/path/to/KERNEL.img MACDECK_VERSION=1.2 make image   # build/macdeck-os-v1.2.img
 ```
 
 `KERNEL.img` is a raw dump of the tablet's `KERNEL` partition. `scripts/backup-partitions.sh` produces one while the tablet is booted into TWRP.
+
+## Run the Mac host
+
+Requirements: Node 22.18+ (runs the TypeScript directly) and `adb`.
+
+```bash
+cd host
+cp config.example.json config.json   # optional: your own buttons (open-app / command actions)
+node src/main.ts                     # MACDECK_SERIAL=<serial> if several devices are attached
+```
+
+The host reconnects automatically. The deck greys out when the Mac goes away.
 
 ## Flashing (at your own risk)
 
@@ -61,13 +83,17 @@ You need [Heimdall](https://git.sr.ht/~grimler/Heimdall) (the maintained fork bu
 
 1. **Back up first.** Flash TWRP to `RECOVERY`, boot it, and run `scripts/backup-partitions.sh <out-dir>`.
 2. Download mode: Power + Home + Volume Down, then Volume Up.
-3. `heimdall flash --RECOVERY build/macdeck-os-v0.img --no-reboot`
+3. `heimdall flash --RECOVERY build/macdeck-os-v1.2.img --no-reboot`
 4. Boot it: Power + Home + Volume Down until the screen goes black, then immediately Power + Home + Volume Up.
 
 Hard-won notes:
 - Samsung's stock `init` **reboots into recovery** if it can't load `/sepolicy`, or if a `critical` service keeps crashing. With MacDeck OS in `RECOVERY` that means a boot loop, so the stock policy files are kept and no service is marked critical.
-- The bootloader ignores the image's own kernel cmdline, so SELinux stays enforcing. `deck0` runs in the `init_shell` domain, which is permissive in the 4.4 policy.
-- Samsung's `adbd` stays `uid=shell` even with `ro.secure=0`.
+- The bootloader ignores the image's own kernel cmdline, so `androidboot.selinux=permissive` does nothing. `init.rc` runs `setenforce 0` instead.
+- Samsung's `adbd` stays `uid=shell` even with `ro.secure=0`, so `adb reboot download` fails. MacDeck OS exposes dev switches the shell user may set:
+  - `setprop debug.macdeck.reboot download|recovery`
+  - `setprop debug.macdeck.deck stop|start`, then test builds from `/data/local/tmp` without reflashing
+- Loopback is down unless something runs `ifup lo`. Without it, every adb-forwarded connection closes immediately.
+- The stock kernel reports touch in portrait axes (x 0–598, y 0–1022) while the framebuffer is landscape. The deck detects this and rotates.
 - **A normal power-on boots stock Android, which rewrites `RECOVERY` with stock recovery** (`install-recovery.sh`) and erases MacDeck OS.
 - A weak USB cable or a bus-powered hub can make the USB link drop when VBUS sags (`mv-udc: vbus is 0`). The backup script survives this with small verified chunks.
 
@@ -77,12 +103,13 @@ The bootloader partitions are never written, so download mode always remains ava
 
 - [x] Safety net: Heimdall on Apple Silicon, TWRP, full verified partition backup
 - [x] MacDeck OS v0: boots to our own deck program, drawing + touch, no Android
-- [ ] Mac link: live metrics on the deck, buttons trigger Mac actions
-- [ ] Text rendering and a real deck layout
-- [ ] Root development channel, SELinux handling, move MacDeck OS to the main boot partition
+- [x] Mac link: live metrics on the deck, buttons trigger Mac actions (protocol v1)
+- [x] Text rendering (Spleen bitmap font) and a first deck layout
+- [ ] Move MacDeck OS to the main boot partition (stock Android currently erases it on a normal boot)
+- [ ] Pages, custom layouts, battery/brightness controls on the deck
 - [ ] AI-agent status (Claude Code, Codex, …)
 - [ ] Wi-Fi transport (tablet on a wall charger)
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Samsung, TWRP and Heimdall are separate projects under their own licenses; none of their files are included here.
+MIT. See [LICENSE](LICENSE). The Spleen font compiled into the deck is BSD-2-Clause ([third_party/spleen/LICENSE](third_party/spleen/LICENSE)). Samsung, TWRP and Heimdall are separate projects under their own licenses; none of their files are included here.
