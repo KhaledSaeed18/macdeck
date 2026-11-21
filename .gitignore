@@ -28,3 +28,4 @@ node_modules/
 
 # Raw font sources (only the generated header + LICENSE are published)
 third_party/spleen/*.bdf
+host/state.json
