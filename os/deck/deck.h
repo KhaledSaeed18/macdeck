@@ -36,11 +36,13 @@ typedef struct { char label[32], value[24], detail[40]; int level, set; } Tile;
 typedef struct { char id[32], label[32]; unsigned color; int home; } Button;
 typedef struct { char key[16]; float v[HISTORY]; int n, head; } Series;
 enum { AGENT_IDLE, AGENT_WORKING, AGENT_WAITING };
-typedef struct { char agent[16], title[48], where[40], since[12], detail[48]; int state, set; } Agent;
+typedef struct { char agent[16], title[48], where[40], since[12], detail[48], id[12]; int state, set; } Agent;
+typedef struct { int total, waiting, working, idle; } AgentCounts;  // all sessions, shown or not
 
 extern Tile tiles[MAX_TILES];
 extern Button buttons[MAX_BUTTONS];
 extern Agent agents[MAX_AGENTS];
+extern AgentCounts agent_counts;
 extern char clock_time[16], clock_date[32];
 extern int connected, dirty;
 
@@ -49,6 +51,7 @@ const Series *series_find(const char *key);
 int  series_linear(const Series *s, float *out); // copies oldest..newest, returns count
 float series_max(const Series *s);
 int  home_button(int i);                       // button slot shown in home position i, or -1
+int  agent_slot(int i);                        // slot of the i-th agent card, or -1
 
 // Bottom-left status line: transient toasts; empty when nothing is happening.
 void toast(const char *text, double secs);

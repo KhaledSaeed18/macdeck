@@ -8,6 +8,7 @@
 Tile tiles[MAX_TILES];
 Button buttons[MAX_BUTTONS];
 Agent agents[MAX_AGENTS];
+AgentCounts agent_counts;
 char clock_time[16] = "--:--", clock_date[32] = "";
 int connected = 0, dirty = 1;
 
@@ -94,7 +95,13 @@ static int handle_button(char **f, int n) {
     return 1;
 }
 
-static int handle_agent(char **f, int n) {  // AGENT|slot|agent|state|title|where|since[|detail]
+int agent_slot(int i) {  // agent cards are drawn in slot order, skipping empty slots
+    for (int s = 0, seen = 0; s < MAX_AGENTS; s++)
+        if (agents[s].set && seen++ == i) return s;
+    return -1;
+}
+
+static int handle_agent(char **f, int n) {  // AGENT|slot|agent|state|title|where|since[|detail[|id]]
     int s = atoi(f[1]);
     if (s < 0 || s >= MAX_AGENTS) return 0;
     Agent *a = &agents[s];
@@ -102,19 +109,25 @@ static int handle_agent(char **f, int n) {  // AGENT|slot|agent|state|title|wher
     int st = !strcmp(f[3], "working") ? AGENT_WORKING : !strcmp(f[3], "waiting") ? AGENT_WAITING : AGENT_IDLE;
     int changed = SET(a->agent, f[2]) | SET(a->title, f[4]) | SET(a->where, f[5]) | SET(a->since, f[6]) |
                   SET(a->detail, n >= 8 ? f[7] : "") | (st != a->state) | !a->set;
+    copy(a->id, sizeof a->id, n >= 9 ? f[8] : "");
     a->state = st; a->set = 1;
     return changed;
 }
 
 void model_handle(char *line) {
-    char *f[8];
-    int n = split(line, f, 8), changed = 0;
+    char *f[10];
+    int n = split(line, f, 10), changed = 0;
     const char *type = f[0];
     if (!strcmp(type, "PING") && n >= 2) link_send("PONG|%s", f[1]);
     else if (!strcmp(type, "CLOCK") && n >= 3) changed = SET(clock_time, f[1]) | SET(clock_date, f[2]);
     else if (!strcmp(type, "TILE") && n >= 6) changed = handle_tile(f);
     else if (!strcmp(type, "BUTTON") && n >= 5) changed = handle_button(f, n);
     else if (!strcmp(type, "AGENT") && n >= 3) changed = handle_agent(f, n);
+    else if (!strcmp(type, "AGENTS") && n >= 5) {
+        AgentCounts c = {atoi(f[1]), atoi(f[2]), atoi(f[3]), atoi(f[4])};
+        changed = memcmp(&c, &agent_counts, sizeof c) != 0;
+        agent_counts = c;
+    }
     else if (!strcmp(type, "SAMPLE") && n >= 3) {
         Series *s = series_get(f[1], 1);
         if (s) { series_push(s, (float)atof(f[2])); changed = 1; }
