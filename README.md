@@ -172,6 +172,20 @@ The host reads what the agents already write to disk. Nothing is installed into 
 - When a session starts waiting for you, or finishes a turn, the host wakes the screen and shows a toast for 15 s (even if the screen was off). A new state has to hold for two polls in a row, to ignore flicker.
 - Both sources are internal formats of those tools and may change between versions. The reader skips what it cannot parse.
 
+## Agent prompts on the deck
+
+When Claude Code asks for permission, asks you a question or wants a plan approved, the deck shows it as a card over whatever page is open, wakes the screen and keeps it on until you answer:
+
+| Card | Choices |
+|---|---|
+| Permission (command, file edit, web fetch, MCP tool, ...) | Allow, Always (shows exactly which rule Claude would remember), Deny |
+| Question (`AskUserQuestion`), one or several, single or multi-choice | the options as tiles, one question at a time; Done for multi-choice |
+| Plan (`ExitPlanMode`) | Auto-accept (approve and accept edits), Approve, Keep planning |
+
+Every card also has **On Mac**: Claude then asks on the Mac as usual. If you answer on the Mac first, the card disappears.
+
+It works through a Claude Code `PermissionRequest` hook. `node src/install-hook.ts` adds it to `~/.claude/settings.json` (a backup is written first; `--remove` takes it out). The hook (`host/src/hook.ts`) hands each request to the host over a private Unix socket (`~/.macdeck/host.sock`); if the host is not running it returns at once and Claude asks as usual. `npm test` runs end-to-end tests of every kind of prompt against the real hook.
+
 ## Button icons
 
 Each button in `host/config.json` can name an icon: `"icon": "ghost"` uses `host/icons/ghost.txt`, 16 lines of 16 `#` (ink) or `.` (empty). The host sends it to the deck, which draws it at 3x above the label on Home and Shortcuts. Adding an icon is a new text file and a host restart, no reflash.
