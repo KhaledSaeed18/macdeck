@@ -4,7 +4,7 @@ Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool but
 
 Instead of running an app on top of Android, MacDeck replaces Android's entire userspace with **MacDeck OS**: the tablet's own stock Linux kernel plus a tiny ramdisk that starts a single deck program. No Android framework, no Java, no launcher. It boots straight into the deck.
 
-> **Status: early work in progress.** MacDeck OS v1.4 is the tablet's main system. Power-on, or plugging in a powered-off tablet, boots straight into the deck. The deck shows live Mac metrics, and its buttons run actions on the Mac over USB.
+> **Status: early work in progress.** MacDeck OS v2.1 is the tablet's main system. Power-on, or plugging in a powered-off tablet, boots straight into the deck. It has two swipeable pages: a **Deck** page with live Mac metrics and buttons that run actions on the Mac over USB, and a **Tablet** page with battery, power and system info and the tablet's power controls.
 
 ## Target hardware
 
@@ -37,6 +37,28 @@ Other devices would need their own kernel, partition layout and quirks. The appr
 Measured: the kernel reaches `init` at ~4.5 s and the deck is running at ~5.1 s, only 4 userspace processes run, and ~834 MB of RAM is free (stock Android idled at ~55 MB free).
 
 **No Samsung or third-party binaries are stored in this repository.** `scripts/build-os-image.py` extracts the kernel and the few stock ramdisk files it reuses from a dump of *your own* device's boot partition at build time.
+
+## Power management
+
+Measured on the SM-T210 over a 250 mA USB port, the backlight dominates power use:
+
+| Backlight | Battery current |
+|---|---|
+| 255 | −426 mA |
+| 160 | −190 mA |
+| 80 (default) | −98 mA |
+| 30 | −56 mA |
+| off | **+78 mA (charging)** |
+
+The deck therefore:
+- defaults to brightness 80
+- dims after 1 min idle and turns the backlight off after 5 min, or 2 min after the Mac disconnects
+- stops rendering while off
+- treats the first touch as wake-only; the power key toggles the screen
+- samples sysfs every 2 s, or every 30 s while off
+- sleeps in poll() for up to 1 s when idle
+
+Without Android, the CPU governor was stuck on `userspace` at 1205 MHz. The deck switches it to `interactive`, or to `conservative` capped at 624 MHz in *saver* mode. All of these are adjustable on the Tablet page. The Mac host stores the settings (the tablet has no persistent storage) and re-sends them on connect.
 
 ## Repository layout
 
@@ -107,7 +129,8 @@ The bootloader partitions are never written, so download mode always remains ava
 - [x] Mac link: live metrics on the deck, buttons trigger Mac actions (protocol v1)
 - [x] Text rendering (Spleen bitmap font) and a first deck layout
 - [x] MacDeck OS as the main system (`KERNEL`), TWRP kept in `RECOVERY`; plugging in a powered-off tablet starts the deck
-- [ ] Pages, custom layouts, battery/brightness controls on the deck
+- [x] Swipeable pages, tablet battery/power page, brightness/dim/off/CPU controls, idle screen-off
+- [ ] Custom layouts and more pages (agent status, notifications)
 - [ ] AI-agent status (Claude Code, Codex, …)
 - [ ] Wi-Fi transport (tablet on a wall charger)
 
