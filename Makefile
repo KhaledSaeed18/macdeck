@@ -23,7 +23,8 @@ build/deck-preview: os/deck/preview.c os/deck/deck.c os/deck/font_spleen.h
 	cc -O2 -Wall -Wno-unused-function -Ios/deck -o $@ os/deck/preview.c
 
 preview: build/deck-preview
-	build/deck-preview build/preview.ppm && sips -s format png build/preview.ppm --out build/preview.png >/dev/null
+	build/deck-preview build/preview.ppm 0 && sips -s format png build/preview.ppm --out build/preview.png >/dev/null
+	build/deck-preview build/preview-tablet.ppm 1 && sips -s format png build/preview-tablet.ppm --out build/preview-tablet.png >/dev/null
 
 # Regenerate the font header from the Spleen BDF sources (third_party/spleen)
 font:
