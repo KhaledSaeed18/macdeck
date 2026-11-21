@@ -1,11 +1,11 @@
 {
   "buttons": [
-    { "id": "terminal", "label": "Terminal", "color": "63dab4", "home": true, "action": { "type": "open-app", "app": "Terminal" } },
-    { "id": "safari", "label": "Safari", "color": "4287f5", "home": true, "action": { "type": "open-app", "app": "Safari" } },
-    { "id": "finder", "label": "Finder", "color": "8fd3ff", "home": true, "action": { "type": "open-app", "app": "Finder" } },
-    { "id": "calculator", "label": "Calculator", "color": "b48cf2", "action": { "type": "open-app", "app": "Calculator" } },
-    { "id": "activity", "label": "Activity", "color": "f5a623", "action": { "type": "open-app", "app": "Activity Monitor" } },
-    { "id": "settings", "label": "Settings", "color": "97aab7", "action": { "type": "open-app", "app": "System Settings" } },
-    { "id": "sleep-display", "label": "Screen Off", "color": "e6465a", "action": { "type": "command", "argv": ["/usr/bin/pmset", "displaysleepnow"] } }
+    { "id": "terminal", "label": "Terminal", "color": "63dab4", "icon": "terminal", "home": true, "action": { "type": "open-app", "app": "Terminal" } },
+    { "id": "safari", "label": "Safari", "color": "4287f5", "icon": "globe", "home": true, "action": { "type": "open-app", "app": "Safari" } },
+    { "id": "finder", "label": "Finder", "color": "8fd3ff", "icon": "folder", "home": true, "action": { "type": "open-app", "app": "Finder" } },
+    { "id": "calculator", "label": "Calculator", "color": "b48cf2", "icon": "calculator", "action": { "type": "open-app", "app": "Calculator" } },
+    { "id": "activity", "label": "Activity", "color": "f5a623", "icon": "chart", "action": { "type": "open-app", "app": "Activity Monitor" } },
+    { "id": "settings", "label": "Settings", "color": "97aab7", "icon": "gear", "action": { "type": "open-app", "app": "System Settings" } },
+    { "id": "sleep-display", "label": "Screen Off", "color": "e6465a", "icon": "moon", "action": { "type": "command", "argv": ["/usr/bin/pmset", "displaysleepnow"] } }
   ]
 }
