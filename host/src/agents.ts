@@ -8,9 +8,8 @@
 //   opencode     ~/.local/share/opencode/opencode.db (SQLite, opened read-only): a session
 //                is working until its newest session_message row is an "idle" one
 //
-// Claude sessions are listed while their process runs. Codex and opencode have no live
-// process per session, so their sessions are listed while working and for RECENT_MS after
-// the last activity.
+// One rule for every agent: a session is listed while it is working or waiting for the user,
+// and for IDLE_SHOWN_MS after it went idle; then it is removed (listAgents).
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -19,7 +18,7 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 export type AgentState = "working" | "waiting" | "idle";
 export interface Agent {
   key: string;            // stable per session
-  agent: string;          // "Claude", "Codex"
+  agent: string;          // "Claude", "Codex", ...
   state: AgentState;
   title: string;          // session name, else the project folder
   where: string;          // project folder name
@@ -31,7 +30,7 @@ const HOME = os.homedir();
 const CLAUDE_SESSIONS = path.join(HOME, ".claude", "sessions");
 const CODEX_HOME = path.join(HOME, ".codex");
 const OPENCODE_DB = path.join(HOME, ".local", "share", "opencode", "opencode.db");
-const RECENT_MS = 30 * 60_000;   // keep an idle Codex / opencode session on the deck this long
+const IDLE_SHOWN_MS = 30 * 60_000;  // keep an idle session on the deck this long, then drop it
 const STALE_MS = 15 * 60_000;    // a "working" session with no activity this long is assumed dead
 
 const alive = (pid: number) => {
@@ -124,7 +123,7 @@ function codexSessions(): Agent[] {
       const file = path.join(dir, f);
       let mtime: number;
       try { mtime = statSync(file).mtimeMs; } catch { continue; }
-      if (now - mtime > Math.max(RECENT_MS, STALE_MS)) continue;
+      if (now - mtime > Math.max(IDLE_SHOWN_MS, STALE_MS)) continue;
       let meta = metaCache.get(file);
       if (!meta?.prompt) {                    // re-read until the prompt has been written
         meta = codexMeta(file);
@@ -140,7 +139,7 @@ function codexSessions(): Agent[] {
         } catch { /* first, partial line of the tail */ }
       }
       const running = last?.type === "task_started" && now - mtime < STALE_MS;
-      if (!running && now - mtime > RECENT_MS) continue;
+      if (!running && now - mtime > IDLE_SHOWN_MS) continue;
       const where = folder(meta.cwd);
       out.push({ key: `codex:${meta.id}`, agent: "Codex", state: running ? "working" : "idle",
         title: codexTitle(meta.id) || meta.prompt || where || "Codex", where, since: last?.at ?? mtime });
@@ -161,9 +160,9 @@ function opencodeSessions(): Agent[] {
     FROM session_v2 s
     WHERE s.parent_id IS NULL AND s.time_archived IS NULL AND s.time_updated > ?`);
   const now = Date.now(), out: Agent[] = [];
-  for (const r of opencodeQuery.all(now - RECENT_MS) as Record<string, string | number | null>[]) {
+  for (const r of opencodeQuery.all(now - IDLE_SHOWN_MS) as Record<string, string | number | null>[]) {
     const active = Number(r.active ?? 0), working = r.last !== null && r.last !== "idle" && now - active < STALE_MS;
-    if (!working && now - active > RECENT_MS) continue;
+    if (!working && now - active > IDLE_SHOWN_MS) continue;
     const where = folder(r.directory);
     out.push({ key: `opencode:${r.id}`, agent: "opencode", state: working ? "working" : "idle",
       title: String(r.title || where || "opencode"), where, since: working ? Number(r.asked ?? active) : active });
@@ -179,8 +178,8 @@ function safe(name: string, read: () => Agent[]): Agent[] {
 }
 
 export function listAgents(): Agent[] {
-  const all = [...safe("claude", claudeSessions), ...safe("codex", codexSessions), ...safe("opencode", opencodeSessions)];
-  return all.sort((a, b) => RANK[a.state] - RANK[b.state] || b.since - a.since);
+  const now = Date.now(), all = [...safe("claude", claudeSessions), ...safe("codex", codexSessions), ...safe("opencode", opencodeSessions)];
+  return all.filter((a) => a.state !== "idle" || now - a.since <= IDLE_SHOWN_MS).sort((a, b) => RANK[a.state] - RANK[b.state] || b.since - a.since);
 }
 
 // "45s", "12m", "3h", "2d" since a timestamp
