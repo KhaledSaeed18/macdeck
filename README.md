@@ -8,7 +8,7 @@ Instead of running an app on top of Android, MacDeck replaces Android's entire u
 
 ## Pages
 
-Swipe left/right; the pages loop around (past the last page comes Home, and back). The dots in the bottom bar show the position. The deck returns to Home when it goes idle.
+Swipe left/right; the pages loop around (past the last page comes Home, and back). The squares in the bottom bar show the position; tap them to open the page picker, one tile per page, and tap a tile to jump straight there. The deck returns to Home when it goes idle.
 
 | Page | What it shows |
 |---|---|
