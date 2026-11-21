@@ -37,7 +37,7 @@
 
 #include "font_spleen.h"
 
-#define BUILD "deck-2.0"
+#define BUILD "deck-2.1"
 #define PORT 8765
 #define MAX_LINE 512
 #define LINK_TIMEOUT 5.0
@@ -368,16 +368,17 @@ static void render_tablet(int ox) {
 }
 
 static void render_battery_badge(void) {
-    int x = W - 150, y = H - BOTTOM + 12;
-    uint32_t c = tab.battery < 0 ? C_DIM : level_color(tab.battery, 1);
-    frame(x, y, 34, 16, 2, rgb(C_DIM));
-    fill(x + 34, y + 5, 3, 6, rgb(C_DIM));
-    if (tab.battery > 0) fill(x + 3, y + 3, 28 * (tab.battery > 100 ? 100 : tab.battery) / 100, 10, rgb(c));
+    // right-aligned to the same 20 px margin as the clock in the top bar
     char b[24];
     int charging = !strcmp(tab.status, "Charging") || !strcmp(tab.status, "Full");
     if (tab.battery >= 0) snprintf(b, sizeof b, "%d%%%s", tab.battery, charging ? " +" : "");
     else copy(b, sizeof b, "--");
-    text(&font_s, x + 46, H - BOTTOM + 8, b, rgb(C_TEXT), W);
+    int tx = W - 20 - text_w(&font_s, b), x = tx - 12 - 37, y = H - BOTTOM + 12;
+    uint32_t c = tab.battery < 0 ? C_DIM : level_color(tab.battery, 1);
+    frame(x, y, 34, 16, 2, rgb(C_DIM));
+    fill(x + 34, y + 5, 3, 6, rgb(C_DIM));
+    if (tab.battery > 0) fill(x + 3, y + 3, 28 * (tab.battery > 100 ? 100 : tab.battery) / 100, 10, rgb(c));
+    text(&font_s, tx, H - BOTTOM + 8, b, rgb(C_TEXT), W);
 }
 
 static void render(void) {
@@ -386,8 +387,9 @@ static void render(void) {
     // top bar
     fill(0, 0, W, TOP, rgb(C_BAR));
     text(&font_m, 20, 12, "MACDECK", rgb(C_ACCENT), 0);
-    fill(200, 22, 12, 12, rgb(connected ? C_ACCENT : C_BAD));
-    text(&font_s, 220, 16, connected ? "Mac connected" : "Mac not connected", rgb(connected ? C_TEXT : C_DIM), 0);
+    int lx = 20 + text_w(&font_m, "MACDECK") + 24;  // link indicator right after the title
+    fill(lx, 22, 12, 12, rgb(connected ? C_ACCENT : C_BAD));
+    text(&font_s, lx + 20, 16, connected ? "Mac connected" : "Mac not connected", rgb(connected ? C_TEXT : C_DIM), 0);
     text(&font_m, W - 20 - text_w(&font_m, clock_time), 12, clock_time, rgb(C_TEXT), 0);
     if (clock_date[0]) text(&font_s, W - 40 - text_w(&font_m, clock_time) - text_w(&font_s, clock_date), 16, clock_date, rgb(C_DIM), 0);
     // page content (slides with drag)
