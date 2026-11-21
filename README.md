@@ -259,6 +259,7 @@ Without Android, the CPU governor was stuck on `userspace` at 1205 MHz. The deck
 | `scripts/build-os-image.py` | Builds the boot image: stock kernel + our ramdisk, stock load addresses |
 | `scripts/backup-partitions.sh` | Dumps every eMMC partition over ADB from TWRP, in verified, resumable chunks |
 | `scripts/bdf2c.py` | Converts BDF bitmap fonts to a C header |
+| `scripts/deck-screenshot.sh`, `scripts/deck-touch.sh` | Testing on the tablet without a finger: save its screen as a PNG; simulated taps and page swipes |
 | `spikes/` | Small experiments (e.g. `fbtouch`, the first framebuffer + touch test) |
 | `Makefile` | Builds everything |
 
