@@ -39,6 +39,9 @@ int  text_w(const Font *f, const char *s);
 void text(const Font *f, int x, int y, const char *s, uint32_t hex, int maxx);
 void text_center(const Font *f, Rect r, const char *s, uint32_t hex);
 void text_right(const Font *f, int right, int y, const char *s, uint32_t hex);
+// Word-wrap s into at most `maxlines` lines of width w, `lh` px apart; words longer than a line
+// are broken, and an overflowing last line ends in "...". Returns the number of lines drawn.
+int  text_wrap(const Font *f, int x, int y, int w, int maxlines, int lh, const char *s, uint32_t hex);
 
 // ---- layout
 Rect inset(Rect r, int d);
@@ -62,8 +65,10 @@ void ui_switch(Rect r, int on, int busy);
 // ---- icons: pixel art, '#' = ink (icons.c)
 typedef struct { int w, h; const char *rows[16]; } Icon;
 extern const Icon icon_off, icon_person, icon_people;
+extern const Icon icon_check, icon_always, icon_cross, icon_laptop, icon_auto, icon_back;
 void icon(const Icon *ic, int x, int y, int scale, uint32_t hex);
 void icon_bits(const uint16_t rows[16], int x, int y, int scale, uint32_t hex);  // 16x16, MSB = left
+void icon_to_bits(const Icon *ic, uint16_t out[16]);
 // Segmented control: n choices shown as icons (2x) with `sel` filled; `pressed` (or -1) is highlighted.
 void ui_segments(Rect r, const Icon *const *icons, int n, int sel, int pressed, int busy);
 // Area/line chart of up to 4 series (n samples each, oldest first) on a 0..max scale.

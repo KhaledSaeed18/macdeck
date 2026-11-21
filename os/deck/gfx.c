@@ -94,6 +94,28 @@ void text_center(const Font *f, Rect r, const char *s, uint32_t hex) {
 }
 void text_right(const Font *f, int right, int y, const char *s, uint32_t hex) { text(f, right - text_w(f, s), y, s, hex, 0); }
 
+int text_wrap(const Font *f, int x, int y, int w, int maxlines, int lh, const char *s, uint32_t hex) {
+    int cpl = w / f->w, lines = 0;
+    char buf[256];
+    if (cpl < 4 || cpl >= (int)sizeof buf - 4) return 0;
+    while (*s && lines < maxlines) {
+        while (*s == ' ') s++;
+        int len = (int)strlen(s), n = len;
+        if (len > cpl) {                                   // break at the last space that fits
+            n = cpl;
+            for (int i = cpl; i > cpl / 3; i--) if (s[i] == ' ') { n = i; break; }
+        }
+        memcpy(buf, s, n); buf[n] = 0;
+        if (lines == maxlines - 1 && len > n) {            // out of room: end with "..."
+            int k = n > cpl - 3 ? cpl - 3 : n;
+            memcpy(buf + k, "...", 4);
+        }
+        text(f, x, y + lines * lh, buf, hex, 0);
+        s += n; lines++;
+    }
+    return lines;
+}
+
 // ---------------------------------------------------------------- layout
 Rect inset(Rect r, int d) { return (Rect){r.x + d, r.y + d, r.w - 2 * d, r.h - 2 * d}; }
 Rect shift(Rect r, int dx) { r.x += dx; return r; }
@@ -126,6 +148,14 @@ void icon(const Icon *ic, int x, int y, int scale, uint32_t hex) {
     for (int r = 0; r < ic->h; r++)
         for (int c = 0; c < ic->w && ic->rows[r][c]; c++)
             if (ic->rows[r][c] == '#') fill(x + c * scale, y + r * scale, scale, scale, hex);
+}
+
+void icon_to_bits(const Icon *ic, uint16_t out[16]) {
+    for (int r = 0; r < 16; r++) {
+        out[r] = 0;
+        for (int c = 0; c < 16 && r < ic->h && c < ic->w && ic->rows[r][c]; c++)
+            if (ic->rows[r][c] == '#') out[r] |= (uint16_t)(0x8000 >> c);
+    }
 }
 
 void icon_bits(const uint16_t rows[16], int x, int y, int scale, uint32_t hex) {
@@ -166,6 +196,12 @@ void ui_button_icon(Rect r, const char *label, const uint16_t *ic, uint32_t colo
     uint32_t ink = state == BTN_PRESSED ? C_INK : state == BTN_DISABLED ? C_DIM : color == C_LOCAL ? C_TEXT : C_INK;
     fill_r(r, bg);
     if (!ic) { text_center(&font_m, inset(r, 8), label, ink); return; }
+    if (r.h < 80) {                                       // a short bar: icon beside the label
+        int w = 32 + 12 + text_w(&font_m, label), x = r.x + (r.w - w) / 2;
+        icon_bits(ic, x, r.y + (r.h - 32) / 2, 2, ink);
+        text(&font_m, x + 44, r.y + (r.h - font_m.h) / 2, label, ink, r.x + r.w - 8);
+        return;
+    }
     int scale = r.h >= 120 ? 3 : 2, gap = 10;            // 48 px icons on the big buttons, 32 px on small
     int top = r.y + (r.h - (16 * scale + gap + font_m.h)) / 2;
     icon_bits(ic, r.x + (r.w - 16 * scale) / 2, top, scale, ink);
