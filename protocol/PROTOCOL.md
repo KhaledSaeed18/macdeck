@@ -57,7 +57,7 @@ The host owns the content. Buttons, tiles and samples are sent by the Mac on eve
 
 | Page | Content |
 |---|---|
-| Home | an agent summary (counts and up to 4 sessions; tap a session to open it, the panel to open Agents), the CPU, memory and network tiles, and three pinned buttons; the deck returns here when the screen dims |
+| Home | an agent summary (counts and up to 4 sessions; tapping anywhere on it opens the Agents page), the CPU, memory and network tiles, and three pinned buttons; the deck returns here when the screen dims |
 | Agents | one card per `AGENT` slot: state, time in that state, title, agent and project; tap to open the session on the Mac |
 | Stats | CPU and memory charts (0–100 %), network chart (down/up, auto-scaled), disk meter |
 | Shortcuts | all button slots in a 4×3 grid |

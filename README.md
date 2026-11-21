@@ -12,7 +12,7 @@ Swipe left/right; the dots in the bottom bar show the position. The deck returns
 
 | Page | What it shows |
 |---|---|
-| **Home** | a summary: agent sessions (counts and the top four; tap one to open it), CPU, memory and network, and three pinned shortcuts |
+| **Home** | a summary: agent sessions (counts and the top four; tap the panel for the Agents page), CPU, memory and network, and three pinned shortcuts |
 | **Agents** | up to six coding-agent sessions (Claude Code, Codex, opencode, Copilot CLI, Qwen Code): needs you, working or idle, and for how long; tap a card to open that session on the Mac |
 | **Stats** | live charts (about 2 minutes) of CPU, memory and network down/up, plus a disk meter |
 | **Shortcuts** | up to 12 buttons that run allowlisted actions on the Mac |
@@ -164,7 +164,7 @@ The host reads what the agents already write to disk. Nothing is installed into 
 - Up to six cards, sorted: needs you, then working, then idle; within each, the most recent first. Anything beyond six is not shown.
 - One rule for every agent: a session is shown while it is working or needs you, and for 30 minutes after it goes idle; then it is removed. A session that claims to be working but has been silent for 15 minutes is treated as idle (a crashed or killed run).
 - Sessions without a name are titled by their first prompt, else the project folder.
-- **Tap a session** (on Home or Agents) and the Mac brings its app to the front. The host walks up from the session's process to the outermost app in `/Applications`: the terminal it runs in (Ghostty, Terminal, ...) or its desktop app (Claude, ChatGPT for Codex Desktop, OpenCode). Sessions without a recorded process are matched by a running agent process with the same working folder. Only the app is activated, not a specific tab, and tmux or ssh sessions can't be traced.
+- **Tap a session card** on the Agents page and the Mac brings its app to the front. (On Home, the agents panel is one tap target that opens the Agents page.) The host walks up from the session's process to the outermost app in `/Applications`: the terminal it runs in (Ghostty, Terminal, ...) or its desktop app (Claude, ChatGPT for Codex Desktop, OpenCode). Sessions without a recorded process are matched by a running agent process with the same working folder. Only the app is activated, not a specific tab, and tmux or ssh sessions can't be traced.
 - An amber **N NEEDS YOU** badge in the top bar shows on every page while any session waits for you. With more than six sessions, the last card becomes **+N more**.
 - Only Claude Code reports "needs you". The others don't write permission waits to disk.
 - **Other agents need their own reader.** Each tool stores its state differently, so an agent that isn't in this table won't appear. A reader is a function in `host/src/agents.ts` that returns the tool's sessions. Gemini CLI isn't supported yet: on the development Mac it never completed a turn, so there was no real log to build a reader from.
