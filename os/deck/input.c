@@ -75,22 +75,29 @@ static void to_screen(int *sx, int *sy) {
     *sy = y < 0 ? 0 : y > H - 1 ? H - 1 : y;
 }
 
+// Control under a point: chrome (page squares, the picker) first; while the picker is open
+// nothing on the page underneath reacts.
+static int ctrl_at(int x, int y) {
+    int c = chrome_hit(x, y);
+    return c >= 0 || picker_open ? c : page_at(page)->hit(x, y);
+}
+
 static void finger_down(int sx, int sy) {
     power_activity();
     if (screen != SCREEN_ON) { swallow = 1; set_screen(SCREEN_ON, "touch"); return; }  // wake only
     swallow = 0; swiping = 0; down_x = sx; down_y = sy; settle_start = 0;
-    start_ctrl = page_at(page)->hit(sx, sy);
+    start_ctrl = ctrl_at(sx, sy);
     if (start_ctrl >= 0) { pressed = start_ctrl; dirty = 1; }
 }
 
 static void finger_move(int sx, int sy) {
     int dx = sx - down_x, dy = sy - down_y;
-    if (!swiping && abs(dx) > SWIPE_START && abs(dx) > abs(dy)) { swiping = 1; pressed = -1; dirty = 1; }
+    if (!swiping && !picker_open && abs(dx) > SWIPE_START && abs(dx) > abs(dy)) { swiping = 1; pressed = -1; dirty = 1; }
     if (swiping) {
         drag = (float)dx; dirty = 1;  // pages wrap around, so there is no end to resist at
         return;
     }
-    int show = page_at(page)->hit(sx, sy) == start_ctrl ? start_ctrl : -1;
+    int show = ctrl_at(sx, sy) == start_ctrl ? start_ctrl : -1;
     if (show != pressed) { pressed = show; dirty = 1; }
 }
 
@@ -101,7 +108,10 @@ static void finger_up(int sx, int sy) {
         page = (page + step + page_count()) % page_count();
         settle_from = drag; settle_start = now();
         logmsg("page %d (%s)", page, page_at(page)->title);
-    } else if (start_ctrl >= 0 && page_at(page)->hit(sx, sy) == start_ctrl) page_at(page)->press(start_ctrl);
+    } else if (start_ctrl >= 0 && ctrl_at(sx, sy) == start_ctrl) {
+        if (start_ctrl >= CHROME_CTRL) chrome_press(start_ctrl);
+        else page_at(page)->press(start_ctrl);
+    }
     pressed = -1; dirty = 1;
 }
 
