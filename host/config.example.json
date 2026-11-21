@@ -1,0 +1,10 @@
+{
+  "buttons": [
+    { "id": "calculator", "label": "Calculator", "color": "63dab4", "action": { "type": "open-app", "app": "Calculator" } },
+    { "id": "terminal", "label": "Terminal", "color": "4287f5", "action": { "type": "open-app", "app": "Terminal" } },
+    { "id": "activity", "label": "Activity", "color": "f5a623", "action": { "type": "open-app", "app": "Activity Monitor" } },
+    { "id": "finder", "label": "Finder", "color": "8fd3ff", "action": { "type": "open-app", "app": "Finder" } },
+    { "id": "safari", "label": "Safari", "color": "b48cf2", "action": { "type": "open-app", "app": "Safari" } },
+    { "id": "sleep-display", "label": "Screen Off", "color": "e6465a", "action": { "type": "command", "argv": ["/usr/bin/pmset", "displaysleepnow"] } }
+  ]
+}
