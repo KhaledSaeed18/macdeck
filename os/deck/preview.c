@@ -60,6 +60,12 @@ int main(int argc, char **argv) {
     feed("AGENT|3|Claude|idle|Write release notes|docs-site|25m||d4e5f6a7");
     feed("AGENT|4|opencode|idle|Tidy the README|tools|28m||b8c9d0e1");
     feed("AGENTS|7|1|2|4");  // 7 sessions: 5 cards + "+2 more"
+    feed("MAC|battery|87|1|Power adapter|Charging, 0:42 to full|Health 96%%  197 cycles  30W adapter");
+    feed("MAC|sound|50|0");
+    feed("MAC|wifi|on|Connected, 192.168.1.20");
+    feed("MAC|airdrop|contacts");
+    feed("MAC|awake|on|On, 1h 05m");
+    feed("MAC|dark|on");
     toast("Opened Calculator", 4);
     pages_render();
     printf("wrote %s (%s)\n", out_path, page_at(page)->title);
