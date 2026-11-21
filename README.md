@@ -4,7 +4,20 @@ Turn an old Android tablet into a dedicated touchscreen deck for a Mac: tool but
 
 Instead of running an app on top of Android, MacDeck replaces Android's entire userspace with **MacDeck OS**: the tablet's own stock Linux kernel plus a tiny ramdisk that starts a single deck program. No Android framework, no Java, no launcher. It boots straight into the deck.
 
-> **Status: early work in progress.** MacDeck OS v2.1 is the tablet's main system. Power-on, or plugging in a powered-off tablet, boots straight into the deck. It has two swipeable pages: a **Deck** page with live Mac metrics and buttons that run actions on the Mac over USB, and a **Tablet** page with battery, power and system info and the tablet's power controls.
+> **Status: early work in progress.** MacDeck OS v3.0 is the tablet's main system. Power-on, or plugging in a powered-off tablet, boots straight into the deck.
+
+## Pages
+
+Swipe left/right; the dots in the bottom bar show the position. The deck returns to Home when it goes idle.
+
+| Page | What it shows |
+|---|---|
+| **Home** | four headline Mac metrics and four pinned shortcuts |
+| **Stats** | live charts (about 2 minutes) of CPU, memory and network down/up, plus a disk meter |
+| **Shortcuts** | up to 12 buttons that run allowlisted actions on the Mac |
+| **Tablet** | battery, power draw, brightness and system readings; brightness, dim/off timeouts, CPU mode, screen off |
+
+Each page is one C file implementing a small interface (`render`, `hit`, `press`) on top of shared widgets (tile, button, panel, meter, chart, grid). Adding a page means writing one file and one registry entry.
 
 ## Target hardware
 
@@ -64,7 +77,7 @@ Without Android, the CPU governor was stuck on `userspace` at 1205 MHz. The deck
 
 | Path | What |
 |---|---|
-| `os/deck/` | The deck program (C, statically linked, libc only), the Spleen font header and a Mac-side preview renderer |
+| `os/deck/` | The deck program (C, static, libc only): `gfx` (drawing and widgets), `model` (state and protocol), `link`, `power`, `input`, `pages` and one `page_*.c` per page, plus a Mac-side preview renderer |
 | `os/ramdisk/` | `init.rc` and `default.prop` for MacDeck OS |
 | `host/` | Mac host: metrics, button layout, actions (`config.example.json`; your own `config.json` is git-ignored) |
 | `protocol/PROTOCOL.md` | The Mac ↔ deck message format (v1) |
@@ -81,8 +94,8 @@ Requirements: Android NDK (r28 tested; found via `ANDROID_NDK_HOME` or `~/Librar
 
 ```bash
 make                     # build/deck (tablet) + build/deck-preview (Mac)
-make preview             # render the deck UI with sample data → build/preview.png
-MACDECK_STOCK_BOOT=/path/to/KERNEL.img MACDECK_VERSION=1.4 make image   # build/macdeck-os-v1.4.img
+make preview             # render every page with sample data → build/preview-<page>.png
+MACDECK_STOCK_BOOT=/path/to/KERNEL.img MACDECK_VERSION=3.0 make image   # build/macdeck-os-v3.0.img
 ```
 
 `KERNEL.img` is a raw dump of the tablet's `KERNEL` partition. `scripts/backup-partitions.sh` produces one while the tablet is booted into TWRP.
@@ -105,8 +118,8 @@ You need [Heimdall](https://git.sr.ht/~grimler/Heimdall) (the maintained fork bu
 
 1. **Back up first.** Flash TWRP to `RECOVERY`, boot it, and run `scripts/backup-partitions.sh <out-dir>`. Keep `KERNEL.img`: it is both the build input and your way back to stock Android.
 2. Download mode: Power + Home + Volume Down, then Volume Up. Once MacDeck OS is running: `adb shell setprop debug.macdeck.reboot download`.
-3. Test from the recovery slot first: `heimdall flash --RECOVERY build/macdeck-os-v1.4.img --no-reboot`, then boot it with Power + Home + Volume Down until the screen goes black, then immediately Power + Home + Volume Up.
-4. Make it the main system: `heimdall flash --KERNEL build/macdeck-os-v1.4.img --RECOVERY twrp.img`. Stock Android will no longer boot; `heimdall flash --KERNEL KERNEL.img` restores it.
+3. Test from the recovery slot first: `heimdall flash --RECOVERY build/macdeck-os-v3.0.img --no-reboot`, then boot it with Power + Home + Volume Down until the screen goes black, then immediately Power + Home + Volume Up.
+4. Make it the main system: `heimdall flash --KERNEL build/macdeck-os-v3.0.img --RECOVERY twrp.img`. Stock Android will no longer boot; `heimdall flash --KERNEL KERNEL.img` restores it.
 
 Hard-won notes:
 - Samsung's stock `init` **reboots into recovery** if it can't load `/sepolicy`, or if a `critical` service keeps crashing. With MacDeck OS in `RECOVERY` that means a boot loop, so the stock policy files are kept and no service is marked critical.
@@ -130,7 +143,8 @@ The bootloader partitions are never written, so download mode always remains ava
 - [x] Text rendering (Spleen bitmap font) and a first deck layout
 - [x] MacDeck OS as the main system (`KERNEL`), TWRP kept in `RECOVERY`; plugging in a powered-off tablet starts the deck
 - [x] Swipeable pages, tablet battery/power page, brightness/dim/off/CPU controls, idle screen-off
-- [ ] Custom layouts and more pages (agent status, notifications)
+- [x] Home / Stats (charts) / Shortcuts / Tablet pages on a modular page interface
+- [ ] More pages as needed (agent status, notifications), context-driven page switching
 - [ ] AI-agent status (Claude Code, Codex, …)
 - [ ] Wi-Fi transport (tablet on a wall charger)
 
