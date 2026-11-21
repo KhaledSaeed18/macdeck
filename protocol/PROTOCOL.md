@@ -22,7 +22,7 @@ The link between the Mac host and the deck running on the tablet.
 | `PONG\|<token>` | Reply to `PING` |
 | `PRESS\|<button-id>` | A button was tapped (touch released inside the same button it started on) |
 | `SETTING\|<key>\|<value>` | The user changed a tablet setting on the deck. The host should store it and send it back on the next connection. |
-| `SCREEN\|on\|dim\|off` | Screen state changed (also sent right after `HELLO`). While `off`, the host may send only `PING`. |
+| `SCREEN\|on\|dim\|off` | Screen state changed (also sent right after `HELLO`). While `off`, the host sends only `PING`, plus `WAKE` and `STATUS` for a notice that should turn the screen on. |
 
 ## Mac → Deck
 
@@ -33,6 +33,7 @@ The link between the Mac host and the deck running on the tablet.
 | `TILE\|<slot>\|<label>\|<value>\|<detail>\|<level>` | Metric tile, slots 0–3. `level` is 0–100 and drives the bar under the value (`-1` = no bar). Home shows all four; Stats uses slot 0 CPU, 1 memory, 2 disk, 3 network for headline values. |
 | `SAMPLE\|<key>\|<number>` | One history point for the Stats charts, about 1/s. The deck keeps the last 120 per key. Keys: `cpu`, `mem` (percent), `net_down`, `net_up` (bytes/s). |
 | `BUTTON\|<slot>\|<id>\|<label>\|<rrggbb>[\|home]` | Defines button slot 0–11, shown on the Shortcuts page. With the `home` flag it is also pinned to the Home page (the first four flagged; if none is flagged, the first four buttons). An empty `id` clears the slot. |
+| `AGENT\|<slot>\|<agent>\|<state>\|<title>\|<where>\|<since>[\|<detail>]` | AI coding-agent session card, slots 0–5, shown on the Agents page in slot order (the host sorts: waiting, then working, then idle). `agent` is e.g. `Claude` or `Codex`; `state` is `working`, `waiting` (needs the user) or `idle`; `title` is the session name; `where` the project folder; `since` how long it has been in this state, preformatted (`45s`, `12m`, `3h`); `detail` what it is waiting for, if known. An empty `agent` clears the slot. Sent about 1/s while the screen is on. |
 | `STATUS\|<text>[\|<seconds>]` | Short-lived message (toast) in the bottom bar, e.g. the result of an action. Shown for `seconds` (default 4, max 60), then the line clears. Use ~8 s for errors. |
 | `SETTING\|<key>\|<value>` | Restore a tablet setting (the tablet has no persistent storage) |
 | `WAKE` | Turn the screen on, e.g. for a notification |
@@ -55,6 +56,7 @@ The host owns the content. Buttons, tiles and samples are sent by the Mac on eve
 | Page | Content |
 |---|---|
 | Home | the four tiles and four pinned buttons; the deck returns here when the screen dims |
+| Agents | one card per `AGENT` slot: state, time in that state, title, agent and project |
 | Stats | CPU and memory charts (0–100 %), network chart (down/up, auto-scaled), disk meter |
 | Shortcuts | all button slots in a 4×3 grid |
 | Tablet | the tablet's battery, power, brightness and system readings and its local controls |
