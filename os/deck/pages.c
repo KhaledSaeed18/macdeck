@@ -35,7 +35,37 @@ void mac_button_press(int slot) {
     toast("Sent to Mac...", 4);
 }
 
+// ---------------------------------------------------------------- agent sessions (Home + Agents)
+const char *agent_state_name(int st) { return st == AGENT_WAITING ? "NEEDS YOU" : st == AGENT_WORKING ? "WORKING" : "IDLE"; }
+uint32_t agent_state_color(int st) {
+    if (!connected) return C_DIM;
+    return st == AGENT_WAITING ? C_WARN : st == AGENT_WORKING ? C_ACCENT : C_DIM;
+}
+
+void agent_focus(int slot) {
+    if (slot < 0 || !agents[slot].set) return;
+    if (!connected) { toast("Mac not connected", 8); return; }
+    if (!agents[slot].id[0]) { toast("Update the Mac host to open sessions", 8); return; }
+    logmsg("focus %s", agents[slot].id);
+    link_send("FOCUS|%s", agents[slot].id);
+    toast("Opening on the Mac...", 4);
+}
+
+void page_show(const Page *p) {
+    for (int i = 0; i < NPAGES; i++)
+        if (registry[i] == p) { page = i; drag = 0; pressed = -1; dirty = 1; }
+}
+
 // ---------------------------------------------------------------- chrome
+static void needs_you_badge(int right) {  // amber pill while any agent session waits for the user
+    if (!connected || agent_counts.waiting <= 0) return;
+    char b[24];
+    snprintf(b, sizeof b, "%d NEEDS YOU", agent_counts.waiting);
+    int w = text_w(&font_s, b) + 20;
+    fill(right - w, 14, w, 28, C_WARN);
+    text(&font_s, right - w + 10, 16, b, C_INK, 0);
+}
+
 static void top_bar(void) {
     fill(0, 0, W, TOP, C_BAR);
     text(&font_m, 20, 12, "MACDECK", C_ACCENT, 0);
@@ -45,7 +75,9 @@ static void top_bar(void) {
     const char *title = registry[page]->title;
     text(&font_s, (W - text_w(&font_s, title)) / 2, 16, title, C_DIM, 0);
     text_right(&font_m, W - 20, 12, clock_time, C_TEXT);
-    if (clock_date[0]) text_right(&font_s, W - 40 - text_w(&font_m, clock_time), 16, clock_date, C_DIM);
+    int date_x = W - 40 - text_w(&font_m, clock_time);
+    if (clock_date[0]) { text_right(&font_s, date_x, 16, clock_date, C_DIM); date_x -= text_w(&font_s, clock_date); }
+    needs_you_badge(date_x - 20);
 }
 
 static void battery_badge(void) {  // right-aligned to the same margin as the clock

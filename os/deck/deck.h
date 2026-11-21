@@ -112,3 +112,7 @@ int  input_tick(double t);                     // advances the page-settle anima
 // Shared page helpers
 void mac_button_press(int slot);   // send a Mac button press (shared by Home and Shortcuts)
 void draw_mac_button(Rect r, int slot, int ctrl);
+const char *agent_state_name(int state);   // "NEEDS YOU", "WORKING", "IDLE"
+uint32_t agent_state_color(int state);     // dimmed while the Mac is not connected
+void agent_focus(int slot);                // ask the Mac to bring that session's app to the front
+void page_show(const Page *p);             // switch to a page (e.g. Home -> Agents)
