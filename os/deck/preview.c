@@ -64,7 +64,6 @@ int main(int argc, char **argv) {
     feed("MAC|sound|50|0");
     feed("MAC|wifi|on|Connected, 192.168.1.20");
     feed("MAC|airdrop|contacts");
-    feed("MAC|awake|on|On, 1h 05m");
     feed("MAC|dark|on");
     toast("Opened Calculator", 4);
     pages_render();

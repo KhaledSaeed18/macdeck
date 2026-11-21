@@ -4,12 +4,13 @@
 //   | MAC BATTERY     Power adapter  | | Wi-Fi                    [  o] |
 //   | 87%                            | | Connected, 192.168.1.20        |
 //   | ==========================     | +--------------------------------+
-//   | Charging, 0:42 to full         | | AirDrop  [Off|Contacts|Everyone]|
-//   | Health 96%  197 cycles         | +---------------+----------------+
-//   +--------------------------------+ | Keep Awake    | Dark Mode      |
-//   | SOUND                      50% | | [o  ]  Off    | [  o]  Dark    |
-//   | [=========|                  ] | +---------------+----------------+
-//   | [ Mute ] [ Quieter ] [ Louder ]| |          Lock Screen           |
+//   | Charging, 0:42 to full         | | AirDrop          [(/) | o | oo]|
+//   | Health 96%  197 cycles         | | Contacts only    off  me  all  |
+//   +--------------------------------+ +--------------------------------+
+//   | SOUND                      50% | | Dark Mode                [  o] |
+//   | [=========|                  ] | | Dark appearance                |
+//   | [ Mute ] [ Quieter ] [ Louder ]| +--------------------------------+
+//   |                                | |          Lock Screen           |
 //   +--------------------------------+ +--------------------------------+
 //
 // Tapping the volume bar sets the volume where it was tapped (16 steps, like the volume keys).
@@ -25,7 +26,7 @@ enum {                              // control indices
     C_VOL0 = 0,                     // C_VOL0 + 0..STEPS: a step of the volume bar
     C_MUTE = C_VOL0 + STEPS + 1, C_DOWN, C_UP, C_WIFI,
     C_AIRDROP0,                     // + AIRDROP_*: a segment
-    C_AWAKE = C_AIRDROP0 + 3, C_DARK, C_LOCK,
+    C_DARK = C_AIRDROP0 + 3, C_LOCK,
 };
 
 static int live(void) { return connected && mac.have; }
@@ -37,11 +38,10 @@ static Rect col(int right) { Rect a = content_area(); int w = (a.w - 16) / 2; re
 static Rect battery_panel(void) { return grid_cell(col(0), 1, 2, 16, 0); }
 static Rect sound_panel(void) { return grid_cell(col(0), 1, 2, 16, 1); }
 static Rect row(int i) { return grid_cell(col(1), 1, 4, 16, i); }      // right column, 4 rows
-static Rect half(int i) { return grid_cell(row(2), 2, 1, 16, i); }     // row 2 holds two half tiles
 
 static Rect vol_bar(Rect s) { return (Rect){s.x + 16, s.y + 64, s.w - 32, 40}; }
 static Rect sound_button(Rect s, int i) { return grid_cell((Rect){s.x + 16, s.y + 124, s.w - 32, 76}, 3, 1, 16, i); }
-static Rect airdrop_segs(Rect t) { return (Rect){t.x + 140, t.y + (t.h - 52) / 2, t.w - 152, 52}; }
+static Rect airdrop_segs(Rect t) { return (Rect){t.x + t.w - 20 - 228, t.y + (t.h - 56) / 2, 228, 56}; }  // 3 icons
 static Rect airdrop_seg(Rect t, int i) { return grid_cell(inset(airdrop_segs(t), 4), 3, 1, 4, i); }
 
 static int step_volume(int step) { return (step * 100 + STEPS / 2) / STEPS; }
@@ -88,41 +88,36 @@ static void draw_sound(Rect r) {
         ui_button(sound_button(r, i), labels[i], i == 0 && muted ? C_WARN : C_LOCAL, button_state(C_MUTE + i, live()));
 }
 
-static void draw_wifi(Rect r) {
-    tile_bg(r, C_WIFI);
-    text(&font_m, r.x + 20, r.y + 16, "Wi-Fi", ink(), 0);
-    text(&font_s, r.x + 20, r.y + 62, mac.have ? mac.wifi_detail : "-", C_DIM, r.x + r.w - 116);
-    ui_switch((Rect){r.x + r.w - 20 - 76, r.y + (r.h - 38) / 2, 76, 38}, mac.val[MAC_WIFI], busy(MAC_WIFI) || !live());
+// A full-width tile: title and detail on the left, an on/off switch on the right
+static void draw_switch_tile(Rect r, int ctrl, const char *title, const char *detail, int key) {
+    tile_bg(r, ctrl);
+    text(&font_m, r.x + 20, r.y + 16, title, ink(), 0);
+    text(&font_s, r.x + 20, r.y + 62, mac.have ? detail : "-", C_DIM, r.x + r.w - 116);
+    ui_switch((Rect){r.x + r.w - 20 - 76, r.y + (r.h - 38) / 2, 76, 38}, mac.val[key], busy(key) || !live());
 }
 
 static void draw_airdrop(Rect r) {
-    static const char *const modes[3] = {"Off", "Contacts", "Everyone"};
+    static const Icon *const icons[3] = {&icon_off, &icon_person, &icon_people};  // AIRDROP_* order
+    static const char *const names[3] = {"Off", "Contacts only", "Everyone"};
     fill_r(r, C_PANEL);
-    text(&font_m, r.x + 20, r.y + (r.h - 32) / 2, "AirDrop", ink(), 0);
+    text(&font_m, r.x + 20, r.y + 16, "AirDrop", ink(), 0);
+    text(&font_s, r.x + 20, r.y + 62, mac.have ? names[mac.val[MAC_AIRDROP]] : "-", C_DIM, airdrop_segs(r).x - 8);
     int pressed_seg = -1;
     for (int i = 0; i < 3; i++) if (is_pressed(C_AIRDROP0 + i)) pressed_seg = i;
-    ui_segments(airdrop_segs(r), modes, 3, mac.val[MAC_AIRDROP], pressed_seg, busy(MAC_AIRDROP) || !live());
-}
-
-static void draw_half(Rect r, int ctrl, const char *title, const char *detail, int key) {
-    tile_bg(r, ctrl);
-    text(&font_m, r.x + 16, r.y + 12, title, ink(), r.x + r.w - 8);
-    ui_switch((Rect){r.x + 16, r.y + 56, 64, 34}, mac.val[key], busy(key) || !live());
-    text(&font_s, r.x + 96, r.y + 61, detail, C_DIM, r.x + r.w - 8);
+    ui_segments(airdrop_segs(r), icons, 3, mac.val[MAC_AIRDROP], pressed_seg, busy(MAC_AIRDROP) || !live());
 }
 
 static void render(int ox) {
     draw_battery(shift(battery_panel(), ox));
     draw_sound(shift(sound_panel(), ox));
-    draw_wifi(shift(row(0), ox));
+    draw_switch_tile(shift(row(0), ox), C_WIFI, "Wi-Fi", mac.wifi_detail, MAC_WIFI);
     draw_airdrop(shift(row(1), ox));
-    draw_half(shift(half(0), ox), C_AWAKE, "Keep Awake", mac.val[MAC_AWAKE] && mac.awake_detail[0] ? mac.awake_detail : mac.val[MAC_AWAKE] ? "On" : "Off", MAC_AWAKE);
-    draw_half(shift(half(1), ox), C_DARK, "Dark Mode", mac.val[MAC_DARK] ? "Dark" : "Light", MAC_DARK);
+    draw_switch_tile(shift(row(2), ox), C_DARK, "Dark Mode", mac.val[MAC_DARK] ? "Dark appearance" : "Light appearance", MAC_DARK);
     ui_button(shift(row(3), ox), "Lock Screen", C_LOCAL, button_state(C_LOCK, live()));
 }
 
 // ---------------------------------------------------------------- talking to the Mac
-static const char *const mac_keys[MAC_NKEYS] = {"wifi", "airdrop", "awake", "dark", "volume", "mute"};
+static const char *const mac_keys[MAC_NKEYS] = {"wifi", "airdrop", "dark", "volume", "mute"};  // MAC_* order
 static const char *const airdrop_names[3] = {"off", "contacts", "everyone"};
 
 void mac_set(int k, int v) {
@@ -147,8 +142,7 @@ static int hit(int x, int y) {
     for (int i = 0; i < 3; i++) if (in_rect(sound_button(s, i), x, y)) return C_MUTE + i;
     if (in_rect(row(0), x, y)) return C_WIFI;
     for (int i = 0; i < 3; i++) if (in_rect(airdrop_seg(row(1), i), x, y)) return C_AIRDROP0 + i;
-    if (in_rect(half(0), x, y)) return C_AWAKE;
-    if (in_rect(half(1), x, y)) return C_DARK;
+    if (in_rect(row(2), x, y)) return C_DARK;
     if (in_rect(row(3), x, y)) return C_LOCK;
     return -1;
 }
@@ -162,7 +156,6 @@ static void press(int i) {
     else if (i == C_UP) mac_set(MAC_VOLUME, step_volume(volume_step(vol) < STEPS ? volume_step(vol) + 1 : STEPS));
     else if (i == C_WIFI) mac_set(MAC_WIFI, !mac.val[MAC_WIFI]);
     else if (i >= C_AIRDROP0 && i < C_AIRDROP0 + 3) mac_set(MAC_AIRDROP, i - C_AIRDROP0);
-    else if (i == C_AWAKE) mac_set(MAC_AWAKE, !mac.val[MAC_AWAKE]);
     else if (i == C_DARK) mac_set(MAC_DARK, !mac.val[MAC_DARK]);
     else if (i == C_LOCK) { link_send("MACSET|lock|now"); toast("Locking the Mac...", 4); }
 }

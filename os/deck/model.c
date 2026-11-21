@@ -135,7 +135,6 @@ static int handle_mac(char **f, int n) {  // MAC|battery|pct|charging|source|lin
     else if (!strcmp(k, "wifi") && n >= 4) changed |= mac_value(MAC_WIFI, on) | SET(mac.wifi_detail, f[3]);
     else if (!strcmp(k, "airdrop") && n >= 3)
         changed |= mac_value(MAC_AIRDROP, !strcmp(f[2], "everyone") ? AIRDROP_EVERYONE : !strcmp(f[2], "off") ? AIRDROP_OFF : AIRDROP_CONTACTS);
-    else if (!strcmp(k, "awake") && n >= 4) changed |= mac_value(MAC_AWAKE, on) | SET(mac.awake_detail, f[3]);
     else if (!strcmp(k, "dark") && n >= 3) changed |= mac_value(MAC_DARK, on);
     return changed;
 }

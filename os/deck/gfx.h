@@ -61,7 +61,7 @@ void ui_switch(Rect r, int on, int busy);
 typedef struct { int w, h; const char *rows[16]; } Icon;
 extern const Icon icon_off, icon_person, icon_people;
 void icon(const Icon *ic, int x, int y, int scale, uint32_t hex);
-// Segmented control: n labelled choices with `sel` filled; `pressed` (or -1) is highlighted.
-void ui_segments(Rect r, const char *const *labels, int n, int sel, int pressed, int busy);
+// Segmented control: n choices shown as icons (2x) with `sel` filled; `pressed` (or -1) is highlighted.
+void ui_segments(Rect r, const Icon *const *icons, int n, int sel, int pressed, int busy);
 // Area/line chart of up to 4 series (n samples each, oldest first) on a 0..max scale.
 void ui_chart(Rect r, const float *const *series, const int *counts, const uint32_t *colors, int nseries, float max);

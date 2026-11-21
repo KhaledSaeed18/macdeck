@@ -128,13 +128,14 @@ void icon(const Icon *ic, int x, int y, int scale, uint32_t hex) {
             if (ic->rows[r][c] == '#') fill(x + c * scale, y + r * scale, scale, scale, hex);
 }
 
-void ui_segments(Rect r, const char *const *labels, int n, int sel, int pressed, int busy) {
+void ui_segments(Rect r, const Icon *const *icons, int n, int sel, int pressed, int busy) {
     fill_r(r, C_BAR);
     for (int i = 0; i < n; i++) {
         Rect c = grid_cell(inset(r, 4), n, 1, 4, i);
         if (i == sel) fill_r(c, busy ? mix(C_ACCENT, C_BAR, 45) : C_ACCENT);
         else if (i == pressed) fill_r(c, mix(C_BAR, C_TEXT, 18));
-        text_center(&font_s, c, labels[i], i == sel ? C_INK : C_TEXT);
+        const Icon *ic = icons[i];
+        icon(ic, c.x + (c.w - ic->w * 2) / 2, c.y + (c.h - ic->h * 2) / 2, 2, i == sel ? C_INK : C_TEXT);
     }
 }
 
