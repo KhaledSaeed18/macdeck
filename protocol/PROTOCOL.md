@@ -30,8 +30,9 @@ The link between the Mac host and the deck running on the tablet.
 |---|---|
 | `PING\|<token>` | Heartbeat, about 1/s. **If the deck hears nothing for 5 s it drops the connection** and shows "disconnected". |
 | `CLOCK\|<time>\|<date>` | Text shown in the top bar, e.g. `CLOCK\|14:05\|Sat 21 Nov` |
-| `TILE\|<slot>\|<label>\|<value>\|<detail>\|<level>` | Metric tile, slots 0–3. `level` is 0–100 and drives the bar under the value (`-1` = no bar). |
-| `BUTTON\|<slot>\|<id>\|<label>\|<rrggbb>` | Defines button slot 0–5. An empty `id` clears the slot. |
+| `TILE\|<slot>\|<label>\|<value>\|<detail>\|<level>` | Metric tile, slots 0–3. `level` is 0–100 and drives the bar under the value (`-1` = no bar). Home shows all four; Stats uses slot 0 CPU, 1 memory, 2 disk, 3 network for headline values. |
+| `SAMPLE\|<key>\|<number>` | One history point for the Stats charts, about 1/s. The deck keeps the last 120 per key. Keys: `cpu`, `mem` (percent), `net_down`, `net_up` (bytes/s). |
+| `BUTTON\|<slot>\|<id>\|<label>\|<rrggbb>[\|home]` | Defines button slot 0–11, shown on the Shortcuts page. With the `home` flag it is also pinned to the Home page (the first four flagged; if none is flagged, the first four buttons). An empty `id` clears the slot. |
 | `STATUS\|<text>[\|<seconds>]` | Short-lived message (toast) in the bottom bar, e.g. the result of an action. Shown for `seconds` (default 4, max 60), then the line clears. Use ~8 s for errors. |
 | `SETTING\|<key>\|<value>` | Restore a tablet setting (the tablet has no persistent storage) |
 | `WAKE` | Turn the screen on, e.g. for a notification |
@@ -47,7 +48,16 @@ The link between the Mac host and the deck running on the tablet.
 
 Measured on the SM-T210 over a 250 mA USB port: brightness 255 ≈ −426 mA, 160 ≈ −190 mA, 80 ≈ −98 mA, 30 ≈ −56 mA, backlight off ≈ +78 mA (charging).
 
-The host owns the layout. Buttons and tiles are defined by the Mac on every connection, so changing the deck's buttons never requires reflashing the tablet.
+The host owns the content. Buttons, tiles and samples are sent by the Mac on every connection, so changing the deck's buttons never requires reflashing the tablet.
+
+## Deck pages
+
+| Page | Content |
+|---|---|
+| Home | the four tiles and four pinned buttons; the deck returns here when the screen dims |
+| Stats | CPU and memory charts (0–100 %), network chart (down/up, auto-scaled), disk meter |
+| Shortcuts | all button slots in a 4×3 grid |
+| Tablet | the tablet's battery, power, brightness and system readings and its local controls |
 
 ## Example session
 
