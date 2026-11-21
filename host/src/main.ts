@@ -6,7 +6,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import { promisify } from "node:util";
-import { loadButtons, runAction, type ButtonDef } from "./actions.ts";
+import { loadButtons, MAX_BUTTONS, runAction, type ButtonDef } from "./actions.ts";
 import { collect } from "./metrics.ts";
 
 const run = promisify(execFile);
@@ -44,7 +44,9 @@ function session(sock: net.Socket): Promise<void> {
       const d = new Date();
       send("CLOCK", d.toTimeString().slice(0, 5), d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", ""));
       try {
-        (await collect()).forEach((t, i) => send("TILE", i, t.label, t.value, t.detail, t.level));
+        const { tiles, samples } = await collect();
+        tiles.forEach((t, i) => send("TILE", i, t.label, t.value, t.detail, t.level));
+        for (const [key, value] of Object.entries(samples)) send("SAMPLE", key, value);
       } catch (e) { log("metrics error:", (e as Error).message); }
       send("PING", ++seq);
     };
@@ -61,9 +63,9 @@ function session(sock: net.Socket): Promise<void> {
         if (type === "HELLO") {
           greeted = true;
           log(`deck says hello: ${f.join(" ")}`);
-          for (let s = 0; s < 6; s++) {
+          for (let s = 0; s < MAX_BUTTONS; s++) {
             const b = buttons[s];
-            send("BUTTON", s, b?.id ?? "", b?.label ?? "", b?.color ?? "000000");
+            send("BUTTON", s, b?.id ?? "", b?.label ?? "", b?.color ?? "000000", b?.home ? "home" : "");
           }
           for (const [k, v] of Object.entries(settings)) send("SETTING", k, v);
           send("STATUS", `Connected to ${os.hostname().replace(/\.local$/, "")}`);
