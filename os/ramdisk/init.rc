@@ -11,7 +11,9 @@
 #    debug.* properties, which the shell user may set:
 #      adb shell setprop debug.macdeck.deck stop|start   stop/start the built-in deck
 #      adb shell setprop debug.macdeck.reboot download   reboot into download mode
-#      adb shell setprop debug.macdeck.reboot recovery   reboot into MacDeck OS again
+#      adb shell setprop debug.macdeck.reboot recovery   reboot into RECOVERY (TWRP)
+#      adb shell setprop debug.macdeck.reboot normal     plain reboot (MacDeck OS)
+#      adb shell setprop debug.macdeck.reboot off        power off
 #    and /data/local/tmp is writable by shell for test binaries.
 #  - /system is mounted read-only only so adbd's shell (/system/bin/sh) and toolbox work.
 #    Nothing from /system is started.
@@ -66,6 +68,12 @@ on property:debug.macdeck.reboot=download
 
 on property:debug.macdeck.reboot=recovery
     powerctl reboot,recovery
+
+on property:debug.macdeck.reboot=normal
+    powerctl reboot
+
+on property:debug.macdeck.reboot=off
+    powerctl shutdown
 
 service ueventd /sbin/ueventd
     seclabel u:r:ueventd:s0
