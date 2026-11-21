@@ -5,7 +5,7 @@
 
 #include "deck.h"
 
-static const Page *const registry[] = {&page_home, &page_agents, &page_stats, &page_shortcuts, &page_tablet};
+static const Page *const registry[] = {&page_home, &page_agents, &page_stats, &page_shortcuts, &page_mac, &page_tablet};
 #define NPAGES (int)(sizeof registry / sizeof registry[0])
 
 int page = 0, pressed = -1, picker_open = 0;

@@ -12,7 +12,7 @@ STRIP := $(TOOLCHAIN)/llvm-strip
 CFLAGS := -static -O2 -Wall -Wextra
 
 DECK_SRC := $(addprefix os/deck/,util.c gfx.c model.c link.c power.c pages.c \
-             page_home.c page_agents.c page_stats.c page_shortcuts.c page_tablet.c)
+             page_home.c page_agents.c page_stats.c page_shortcuts.c page_mac.c page_tablet.c)
 DECK_HDR := $(wildcard os/deck/*.h)
 
 all: build/deck build/deck-preview
@@ -27,7 +27,7 @@ build/deck-preview: $(DECK_SRC) os/deck/preview.c $(DECK_HDR)
 	@mkdir -p build
 	cc -O2 -Wall -Wextra -Ios/deck -o $@ $(DECK_SRC) os/deck/preview.c
 
-PAGES := home agents stats shortcuts tablet
+PAGES := home agents stats shortcuts mac tablet
 preview: build/deck-preview
 	@i=0; for p in $(PAGES); do \
 	  build/deck-preview build/preview-$$p.ppm $$i >/dev/null && \
