@@ -16,6 +16,7 @@ Swipe left/right; the pages loop around (past the last page comes Home, and back
 | **Agents** | up to six coding-agent sessions (Claude Code, Codex, opencode, Copilot CLI, Qwen Code): needs you, working or idle, and for how long; tap a card to open that session on the Mac |
 | **Stats** | live charts (about 2 minutes) of CPU, memory and network down/up, plus a disk meter |
 | **Shortcuts** | up to 12 buttons that run allowlisted actions on the Mac |
+| **Mac** | a control centre for the Mac: battery (health, cycles, adapter), volume bar with mute, Wi-Fi, AirDrop, Keep Awake, Dark Mode, Lock Screen |
 | **Tablet** | battery, power draw, brightness and system readings; brightness, dim/off timeouts, CPU mode, screen off |
 
 Each page is one C file implementing a small interface (`render`, `hit`, `press`) on top of shared widgets (tile, button, panel, meter, chart, grid). Adding a page means writing one file and one registry entry.
@@ -171,6 +172,24 @@ The host reads what the agents already write to disk. Nothing is installed into 
 - When a session starts waiting for you, or finishes a turn, the host wakes the screen and shows a toast for 15 s (even if the screen was off). A new state has to hold for two polls in a row, to ignore flicker.
 - Both sources are internal formats of those tools and may change between versions. The reader skips what it cannot parse.
 
+## Mac page
+
+Everything uses tools that ship with macOS; the deck only sends `MACSET|key|value` and the host maps each key to one fixed command (`host/src/mac.ts`):
+
+| Control | Read | Change |
+|---|---|---|
+| Battery | `pmset -g batt`, `ioreg -rn AppleSmartBattery` (health = nominal / design capacity) | |
+| Sound | `osascript`: `get volume settings` | `set volume output volume N` (unmutes), `set volume output muted` |
+| Wi-Fi | `networksetup -getairportpower`, `ipconfig getifaddr` | `networksetup -setairportpower` |
+| AirDrop | `defaults read com.apple.sharingd DiscoverableMode` | write it, then restart `sharingd` |
+| Keep Awake | | a `caffeinate -dim -w <host pid>` child (ends with the host) |
+| Dark Mode | `defaults read -g AppleInterfaceStyle` | System Events `appearance preferences` (macOS asks once to allow automation) |
+| Lock Screen | | `SACLockScreenImmediate()` from `login.framework` via `python3` `ctypes` |
+
+- Taps show the change at once and fade it until the Mac confirms (or 4 s pass).
+- The Wi-Fi network name needs Location permission on recent macOS, so the page shows the address instead.
+- Bluetooth is not on the page: macOS has no command for it, and a helper would need its own Bluetooth permission.
+
 ## Power management
 
 Measured on the SM-T210 over a 250 mA USB port, the backlight dominates power use:
@@ -214,7 +233,7 @@ Without Android, the CPU governor was stuck on `userspace` at 1205 MHz. The deck
 |---|---|
 | `os/deck/` | The deck program (C, static, libc only): `gfx` (drawing and widgets), `model` (state and protocol), `link`, `power`, `input`, `pages` and one `page_*.c` per page, plus a Mac-side preview renderer |
 | `os/ramdisk/` | `init.rc` and `default.prop` for MacDeck OS |
-| `host/` | Mac host: metrics, agent sessions, button layout, actions (`config.example.json`; your own `config.json` is git-ignored) |
+| `host/` | Mac host: metrics, agent sessions, Mac controls, button layout, actions (`config.example.json`; your own `config.json` is git-ignored) |
 | `protocol/PROTOCOL.md` | The Mac ↔ deck message format (v1) |
 | `third_party/spleen/` | Spleen font license (the font is compiled into the deck) |
 | `scripts/build-os-image.py` | Builds the boot image: stock kernel + our ramdisk, stock load addresses |
