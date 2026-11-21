@@ -15,7 +15,7 @@
 
 #include "gfx.h"
 
-#define BUILD "deck-3.6"
+#define BUILD "deck-3.7"
 #define TOP 56          // top bar height
 #define BOTTOM 40       // bottom bar height
 #define MAX_TILES 4
