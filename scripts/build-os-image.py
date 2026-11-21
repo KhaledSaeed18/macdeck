@@ -3,7 +3,7 @@
 
 Takes Samsung's stock kernel and a few stock ramdisk files from the backed-up KERNEL.img,
 adds our init.rc / default.prop / deck binary, and packs an Android v0 boot image with the
-same load addresses as the stock one. Output: build/macdeck-os-v0.img (+ .sha256).
+same load addresses as the stock one. Output: build/macdeck-os-v$MACDECK_VERSION.img (+ .sha256).
 
 Usage: scripts/build-os-image.py [path/to/deck0-binary]
 Env:   MACDECK_STOCK_BOOT=path/to/stock/KERNEL.img (a raw dump of the tablet's KERNEL
@@ -15,8 +15,9 @@ import gzip, hashlib, io, os, stat, struct, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STOCK = os.environ.get("MACDECK_STOCK_BOOT",
                        os.path.join(ROOT, "backups/2026-11-21-stock-with-twrp/KERNEL.img"))
-OUT = os.path.join(ROOT, "build/macdeck-os-v0.img")
-DECK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "build/deck0")
+VERSION = os.environ.get("MACDECK_VERSION", "1")
+OUT = os.path.join(ROOT, f"build/macdeck-os-v{VERSION}.img")
+DECK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "build/deck")
 PAGE = 2048
 KERNEL_ADDR, RAMDISK_ADDR, TAGS_ADDR = 0x10008000, 0x11000000, 0x10000100
 CMDLINE = b"androidboot.selinux=permissive"
@@ -74,7 +75,7 @@ def main():
     for name, src, perm in (("init.rc", "os/ramdisk/init.rc", 0o750),
                             ("default.prop", "os/ramdisk/default.prop", 0o644)):
         entries.append((name, F | perm, open(os.path.join(ROOT, src), "rb").read()))
-    entries.append(("sbin/deck0", F | X, open(DECK, "rb").read()))
+    entries.append(("sbin/deck", F | X, open(DECK, "rb").read()))
 
     ramdisk = gzip.compress(newc(entries), compresslevel=9, mtime=0)
     hdr = struct.pack("<8s10I16s512s32s", b"ANDROID!", len(kernel), KERNEL_ADDR, len(ramdisk),
