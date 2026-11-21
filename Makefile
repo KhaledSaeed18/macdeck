@@ -1,7 +1,8 @@
 # MacDeck build. Requires the Android NDK (any recent version; r28 used) and Python 3.
 #   make            build build/deck (tablet) and build/deck-preview (Mac)
 #   make image      build build/macdeck-os-v$MACDECK_VERSION.img (needs MACDECK_STOCK_BOOT, see README)
-#   make preview    render every deck page with sample data to build/preview-<page>.png
+#   make preview    render every deck page with sample data to build/preview-<page>.png,
+#                   plus the page picker open over Agents (build/preview-picker.png)
 #   make clean
 NDK ?= $(firstword $(ANDROID_NDK_HOME) $(wildcard $(HOME)/Library/Android/sdk/ndk/*))
 HOST_TAG ?= $(shell uname -s | tr A-Z a-z)-x86_64
@@ -32,6 +33,8 @@ preview: build/deck-preview
 	  build/deck-preview build/preview-$$p.ppm $$i >/dev/null && \
 	  sips -s format png build/preview-$$p.ppm --out build/preview-$$p.png >/dev/null && echo build/preview-$$p.png; \
 	  i=$$((i+1)); done
+	@MACDECK_PICKER=1 build/deck-preview build/preview-picker.ppm 1 >/dev/null && \
+	  sips -s format png build/preview-picker.ppm --out build/preview-picker.png >/dev/null && echo build/preview-picker.png
 
 # Regenerate the font header from the Spleen BDF sources (third_party/spleen)
 font:

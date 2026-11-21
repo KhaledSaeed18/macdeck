@@ -2,6 +2,7 @@
 // so layout changes can be checked without flashing the tablet. Built from the same
 // modules as the deck except main.c and input.c (see the Makefile `preview` target).
 //   build/deck-preview out.ppm [page] [pressed-control] [disconnected]
+//   MACDECK_PICKER=1 draws the page picker open over the page
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -33,6 +34,7 @@ int main(int argc, char **argv) {
     page = argc > 2 ? atoi(argv[2]) : 0;
     pressed = argc > 3 ? atoi(argv[3]) : -1;
     connected = !(argc > 4);
+    picker_open = getenv("MACDECK_PICKER") != NULL;
     tab = (Tablet){.battery = 28, .current_ma = -98, .temp_dc = 285, .mv = 3712, .freq_mhz = 624,
                    .mem_free_mb = 798, .mem_total_mb = 832, .uptime = 4980};
     copy(tab.status, sizeof tab.status, "Discharging");
