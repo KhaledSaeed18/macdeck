@@ -1,0 +1,13 @@
+{
+  "name": "macdeck-host",
+  "version": "0.1.0",
+  "description": "Mac side of MacDeck: sends metrics and the button layout to the deck, runs actions on button presses.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "start": "node src/main.ts",
+    "check": "node --check src/main.ts"
+  }
+}
