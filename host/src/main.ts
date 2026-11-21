@@ -13,6 +13,7 @@ import { AgentWatcher, ago, ascii, listAgents, type Agent } from "./agents.ts";
 import { focusAgent } from "./focus.ts";
 import { iconHex } from "./icons.ts";
 import { readMac, setMac } from "./mac.ts";
+import { PromptBroker } from "./prompts.ts";
 import { collect } from "./metrics.ts";
 
 const run = promisify(execFile);
@@ -27,6 +28,7 @@ const ADB = process.env.ADB ?? [
 ].find((p) => existsSync(p)) ?? "adb";
 
 const buttons: ButtonDef[] = loadButtons(import.meta.url);
+const prompts = new PromptBroker();               // agent prompts answered on the deck (prompts.ts)
 
 // Tablet settings (brightness, dim/off timeouts, CPU mode). MacDeck OS has no writable
 // storage that survives a reboot, so the host keeps them and re-sends them on connect.
@@ -121,6 +123,7 @@ function session(sock: net.Socket): Promise<void> {
         if (type === "HELLO") {
           greeted = true;
           log(`deck says hello: ${f.join(" ")}`);
+          prompts.attach((...fields) => send(...fields));
           for (let s = 0; s < MAX_BUTTONS; s++) {
             const b = buttons[s];
             send("BUTTON", s, b?.id ?? "", b?.label ?? "", b?.color ?? "000000", b?.home ? "home" : "");
@@ -138,6 +141,8 @@ function session(sock: net.Socket): Promise<void> {
           if (on !== screenOn) log(`tablet screen ${f[0]}`);
           screenOn = on;
           if (on) void tick();
+        } else if (type === "ANSWER" && f.length >= 2) {
+          prompts.answer(f[0], f[1], log);
         } else if (type === "MACSET" && f.length >= 2) {
           log(`mac ${f[0]}=${f[1]}`);
           setMac(f[0], f[1]).then(
@@ -162,13 +167,14 @@ function session(sock: net.Socket): Promise<void> {
         }
       }
     });
-    sock.on("close", () => { clearInterval(timer); resolve(); });
+    sock.on("close", () => { clearInterval(timer); prompts.detach(); resolve(); });
     sock.on("error", (e) => log("socket error:", e.message));
   });
 }
 
 async function main() {
   log(`MacDeck host, adb=${ADB}${SERIAL ? `, serial=${SERIAL}` : ""}`);
+  prompts.listen(log);
   for (;;) {
     try {
       await adb("forward", `tcp:${LOCAL_PORT}`, `tcp:${DECK_PORT}`);
